@@ -274,6 +274,7 @@ dependencies = [
  "cw-storage-plus",
  "cw20",
  "cw20-base-dogether",
+ "loterra-staking-contract-dogether",
  "schemars",
  "serde",
  "terra-cosmwasm",
@@ -419,7 +420,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12b8adadd720df158f4d70dfe7ccc6adb0472d7c55ca83445f6a5ab3e36f8fb6"
 
 [[package]]
-name = "loterra-staking-contract"
+name = "loterra-staking-contract-dogether"
 version = "2.0.2"
 dependencies = [
  "cosmwasm-bignumber",

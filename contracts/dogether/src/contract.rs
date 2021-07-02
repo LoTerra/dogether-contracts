@@ -9,6 +9,7 @@ use crate::state::{Config, State, CONFIG, STATE, store_config, read_state, read_
 use crate::taxation::deduct_tax;
 use cw20;
 use cw20_base_dogether;
+use loterra_staking_contract_dogether;
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[entry_point]
@@ -144,11 +145,22 @@ pub fn try_un_pool(
     /*
        TODO: Call staking contract in order to init unPool with un-bonding period
     */
+    let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount };
+    let msg_un_bond = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
+        msg: un_bond.into(),
+        send: vec![]
+    };
 
     // Remove UST amount pooled
     state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
     store_state(deps.storage, &state)?;
-    Ok(Response::default())
+    Ok(Response{
+        submessages: vec![],
+        messages: vec![msg_un_bond.into()],
+        attributes: vec![],
+        data: None
+    })
 }
 
 pub fn try_claim_un_pool(
