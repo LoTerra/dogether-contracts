@@ -150,10 +150,11 @@ pub fn handle_unbound(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
+    address: String
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
 
-    let address_raw = deps.api.addr_canonicalize(&info.sender.as_str())?;
+    let address_raw = deps.api.addr_canonicalize(&address)?;
 
     if !info.funds.is_empty() {
         return Err(StdError::generic_err("Do not send funds with stake"));

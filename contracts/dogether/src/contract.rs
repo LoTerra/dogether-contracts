@@ -145,7 +145,7 @@ pub fn try_un_pool(
     /*
        TODO: Call staking contract in order to init unPool with un-bonding period
     */
-    let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount };
+    let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount, address: info.sender.to_string()};
     let msg_un_bond = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: un_bond.into(),

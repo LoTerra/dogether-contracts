@@ -44,7 +44,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     match msg {
         ExecuteMsg::GetTicket { recipient, combination  } => handle_get_ticket(deps, env, info, recipient, combination),
         ExecuteMsg::UpdateGlobalIndex {} => handle_update_global_index(deps, env),
-        ExecuteMsg::UnbondStake { amount } => handle_unbound(deps, env, info, amount),
+        ExecuteMsg::UnbondStake { amount, address } => handle_unbound(deps, env, info, amount, address),
         ExecuteMsg::WithdrawStake { cap } => handle_withdraw_stake(deps, env, info, cap),
         ExecuteMsg::Receive(msg) => handle_receive(deps, env, info, msg),
     }

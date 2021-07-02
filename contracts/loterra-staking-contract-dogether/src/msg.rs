@@ -24,7 +24,7 @@ pub enum ExecuteMsg {
     /// Unbound user staking balance
     /// Withdraw rewards to pending rewards
     /// Set current reward index to global index
-    UnbondStake { amount: Uint128 },
+    UnbondStake { amount: Uint128, address: String },
 
     /// Unbound user staking balance
     /// Withdraws released stake
