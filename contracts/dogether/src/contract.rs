@@ -152,9 +152,6 @@ pub fn try_un_pool(
         send: vec![]
     };
 
-    // Remove UST amount pooled
-    state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
-    store_state(deps.storage, &state)?;
     Ok(Response{
         submessages: vec![],
         messages: vec![msg_un_bond.into()],
@@ -168,11 +165,14 @@ pub fn try_claim_un_pool(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let state = read_state(deps.storage)?;
+    let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
     /*
        TODO: Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
+    // Remove UST amount pooled
+    state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
+    store_state(deps.storage, &state)?;
     Ok(Response::default())
 }
 pub fn try_redeem_earning(
@@ -183,9 +183,29 @@ pub fn try_redeem_earning(
     let state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
     /*
+       TODO: Multiply with anchor tax
        TODO: Redeem earning from anchor
     */
-    Ok(Response::default())
+
+    /*
+       TODO: Calculation difference in stake
+    */
+    let total_pooled = state.total_ust_pool;
+    /*
+        Send earning to staking contract
+     */
+    let update_global_index = loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
+    let msg_update_global_index = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
+        msg: update_global_index.into(),
+        send: vec![Coin{ denom: config.denom, amount: Default::default() }]
+    };
+    Ok(Response{
+        submessages: vec![],
+        messages: vec![msg_update_global_index.into()],
+        attributes: vec![],
+        data: None
+    })
 }
 /*pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
