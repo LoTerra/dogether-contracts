@@ -37,7 +37,10 @@ pub enum ExecuteMsg {
     /// Bot's operations
     /////////////////
     /// Purchase tickets on LoTerra lottery contract with pool rewards
-    GetTicket { recipient: String, combination: Vec<String>},
+    GetTicket {
+        recipient: String,
+        combination: Vec<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

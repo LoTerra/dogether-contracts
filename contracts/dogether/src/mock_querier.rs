@@ -1,3 +1,4 @@
+use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
     from_slice, to_binary, Addr, Api, BalanceResponse, BankQuery, Binary, Coin, ContractResult,
@@ -10,7 +11,6 @@ use terra_cosmwasm::{
     ExchangeRateItem, ExchangeRatesResponse, TaxCapResponse, TaxRateResponse, TerraQuery,
     TerraQueryWrapper, TerraRoute,
 };
-use cosmwasm_bignumber::{Uint256, Decimal256};
 
 pub const MOCK_HUB_CONTRACT_ADDR: &str = "hub";
 pub const MOCK_CW20_CONTRACT_ADDR: &str = "lottery";
@@ -36,7 +36,7 @@ pub struct WasmMockQuerier {
 #[derive(Clone, Default, Serialize)]
 pub struct EpochResponse {
     pub exchange_rate: Decimal256,
-    pub aterra_supply: Uint256
+    pub aterra_supply: Uint256,
 }
 
 impl Querier for WasmMockQuerier {
@@ -56,15 +56,17 @@ impl Querier for WasmMockQuerier {
 
 impl WasmMockQuerier {
     pub fn handle_query(&self, request: &QueryRequest<TerraQueryWrapper>) -> QuerierResult {
-
         match &request {
-           QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
+            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
                 if contract_addr == "addr0001" {
                     let d = Decimal::percent(105);
-                    let res = EpochResponse{ exchange_rate: Decimal256::from(d), aterra_supply: Uint256::zero() };
+                    let res = EpochResponse {
+                        exchange_rate: Decimal256::from(d),
+                        aterra_supply: Uint256::zero(),
+                    };
                     return SystemResult::Ok(ContractResult::from(to_binary(&res)));
                 }
-               panic!("DO NOT ENTER HERE")
+                panic!("DO NOT ENTER HERE")
             }
             QueryRequest::Custom(TerraQueryWrapper { route, query_data }) => match query_data {
                 TerraQuery::TaxRate {} => {

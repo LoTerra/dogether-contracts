@@ -1,14 +1,20 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery, Decimal, StdError};
+use cosmwasm_std::{
+    entry_point, to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128, Uint64, WasmMsg, WasmQuery,
+};
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Anchor, EpochStateResponse};
-use crate::state::{Config, State, store_config, read_state, read_config, store_state};
+use crate::math::{
+    decimal_div_in_256, decimal_multiplication_in_256, decimal_subtraction_in_256,
+    decimal_summation_in_256,
+};
+use crate::msg::{Anchor, CountResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{read_config, read_state, store_config, store_state, Config, State};
 use crate::taxation::deduct_tax;
+use cosmwasm_bignumber::{Decimal256, Uint256};
 use cw20;
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
-use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256, decimal_div_in_256};
-use cosmwasm_bignumber::{Decimal256, Uint256};
 use std::ops::{Mul, Sub};
 use std::str::FromStr;
 
@@ -30,11 +36,12 @@ pub fn instantiate(
     };
     store_config(deps.storage, &config)?;
 
-    let state = State{
+    let state = State {
         staking_address: deps.api.addr_canonicalize("addr0002")?,
         cw20_address: deps.api.addr_canonicalize("addr0003")?,
-        draw_period: 0,
-        total_ust_pool: Uint128(150_000_000_000)
+        draw_period: 100,
+        next_draw: 1000,
+        total_ust_pool: Uint128(150_000_000_000),
     };
     store_state(deps.storage, &state)?;
 
@@ -111,23 +118,23 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
     };
 
     /*
-      Bond is a customized cw20 message who mint some cw20 tokens
-      and stake at the same times
-      TODO: Customize the cw20 base contract and add Bond msg
-      @message: Bond
-      @params: (contract_address: String, amount: Uint128, msg: Binary, recipient: String)
-   */
+       Bond is a customized cw20 message who mint some cw20 tokens
+       and stake at the same times
+       TODO: Customize the cw20 base contract and add Bond msg
+       @message: Bond
+       @params: (contract_address: String, amount: Uint128, msg: Binary, recipient: String)
+    */
     let bond = cw20_base_dogether::msg::ExecuteMsg::Bond {
         contract: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         amount: sent,
         msg: Binary::from_base64("eyAiYm9uZF9zdGFrZSI6IHt9IH0=")?,
-        recipient: info.sender.to_string()
+        recipient: info.sender.to_string(),
     };
 
     let bond_msg = WasmMsg::Execute {
         contract_addr: "".to_string(),
         msg: to_binary(&bond)?,
-        send: vec![]
+        send: vec![],
     };
 
     // Add UST amount pooled
@@ -155,18 +162,21 @@ pub fn try_un_pool(
     /*
        TODO: Call staking contract in order to init unPool with un-bonding period
     */
-    let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount, address: info.sender.to_string()};
+    let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake {
+        amount,
+        address: info.sender.to_string(),
+    };
     let msg_un_bond = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&un_bond)?,
-        send: vec![]
+        send: vec![],
     };
 
-    Ok(Response{
+    Ok(Response {
         submessages: vec![],
         messages: vec![msg_un_bond.into()],
         attributes: vec![],
-        data: None
+        data: None,
     })
 }
 
@@ -190,53 +200,76 @@ pub fn try_redeem_earning(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let state = read_state(deps.storage)?;
+    let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
+    if !info.funds.is_empty() {
+        return Err(ContractError::DoNotSendFunds {});
+    }
+    if env.block.height < state.next_draw {
+        return Err(ContractError::RetryRedeemLater(state.next_draw));
+    }
     /*
        TODO: Multiply with anchor tax
        TODO: Redeem earning from anchor
     */
-    let epoch = Anchor::EpochState { block_height: None, distributed_interest: None };
-    let msg_epoch = WasmQuery::Smart { contract_addr: deps.api.addr_humanize(&config.money_market_address)?.to_string(), msg: to_binary(&epoch)?};
-    let res :EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
+    let epoch = Anchor::EpochState {
+        block_height: None,
+        distributed_interest: None,
+    };
+    let msg_epoch = WasmQuery::Smart {
+        contract_addr: deps
+            .api
+            .addr_humanize(&config.money_market_address)?
+            .to_string(),
+        msg: to_binary(&epoch)?,
+    };
+    let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
     println!("{}", res.exchange_rate);
     // TODO: this calculation need decimal256
     let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
     println!("{}", total_ust_pool);
-    let total_with_interest_ust = decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
+    let total_with_interest_ust =
+        decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
     println!("{}", total_with_interest_ust);
-    let interest_ust =
-        decimal_subtraction_in_256 (total_with_interest_ust, total_ust_pool);
+    let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
     println!("{}", interest_ust);
-    let interest_a_ust = Decimal256::from(interest_ust) / res.exchange_rate;
-        //decimal_div_in_256(interest_ust, res.exchange_rate.into());
+    let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
 
-    let interest_to_withdraw =Uint256::from(interest_a_ust.0);
-   // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
-    let e = Decimal::from(interest_a_ust.into()) * Uint128(1);
-    println!("{}, {}", interest_to_withdraw, e);
+    //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
+    // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
+    let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
+    //println!("{}, {}", interest_to_withdraw, e);
 
     //println!("{:?}", get_decimals(interest_a_ust));
     //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
     //println!("{}", all_reward_with_decimals);
+
     /*
-       TODO: Calculation difference in stake
+       Send earning to staking contract
     */
-    let total_pooled = state.total_ust_pool;
-    /*
-        Send earning to staking contract
-     */
-    let update_global_index = loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
+    let update_global_index =
+        loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
     let msg_update_global_index = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&update_global_index)?,
-        send: vec![Coin{ denom: config.denom, amount: Default::default() }]
+        send: vec![Coin {
+            denom: config.denom,
+            amount: interest_to_withdraw,
+        }],
     };
-    Ok(Response{
+
+    state.total_ust_pool = state
+        .total_ust_pool
+        .checked_sub(interest_to_withdraw)
+        .unwrap();
+    state.next_draw = env.block.height.checked_add(state.draw_period).unwrap();
+    store_state(deps.storage, &state)?;
+
+    Ok(Response {
         submessages: vec![],
         messages: vec![msg_update_global_index.into()],
         attributes: vec![],
-        data: None
+        data: None,
     })
 }
 
@@ -276,7 +309,7 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        _ => Ok(Default::default())
+        _ => Ok(Default::default()),
     }
 }
 
@@ -287,9 +320,9 @@ fn query_count(deps: Deps) -> StdResult<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use crate::mock_querier::{mock_dependencies};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, Empty};
     fn default_init(deps: DepsMut) {
         let msg = InstantiateMsg {
             code_id_cw20: 0,
@@ -342,10 +375,56 @@ mod tests {
     fn redeem_earning() {
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
+        // Sending funds error
         let info = mock_info("addr0000", &coins(100, "uusd"));
         let env = mock_env();
         let res = try_redeem_earning(deps.as_mut(), env, info);
-        println!("{:?}", res)
+        match res {
+            Err(ContractError::DoNotSendFunds {}) => {}
+            _ => panic!("Do not enter here"),
+        }
+        let info = mock_info("addr0000", &[]);
+        let env = mock_env();
+        let state_before = read_state(deps.as_ref().storage).unwrap();
+        let res = try_redeem_earning(deps.as_mut(), env.clone(), info).unwrap();
+        let state = read_state(deps.as_ref().storage).unwrap();
+        println!("{:?}", res);
+        assert!(state_before.total_ust_pool > state.total_ust_pool);
+        assert!(state_before.next_draw < state.next_draw);
+        assert_eq!(state.next_draw, env.block.height + state.draw_period);
+        assert_eq!(state_before.draw_period, state.draw_period);
+        assert_eq!(state_before.staking_address, state.staking_address);
+        assert_eq!(state_before.cw20_address, state.cw20_address);
+
+        let update_global_index =
+            loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
+        assert_eq!(
+            res.messages,
+            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "addr0002".to_string(),
+                msg: to_binary(&update_global_index).unwrap(),
+                send: vec![Coin {
+                    denom: "uusd".to_string(),
+                    amount: Uint128(7142857142)
+                }]
+            })]
+        )
+    }
+
+    #[test]
+    fn redeem_earning_still_in_progress() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let mut env = mock_env();
+        env.block.height = 100;
+        let res = try_redeem_earning(deps.as_mut(), env, info);
+        match res {
+            Err(ContractError::RetryRedeemLater(msg)) => {
+                assert_eq!(1000, msg)
+            }
+            _ => panic!("Do not enter here"),
+        }
     }
 
     /* #[test]

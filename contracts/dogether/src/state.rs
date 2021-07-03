@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, Uint128, Storage, StdResult};
+use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint128};
 use cw_storage_plus::Item;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ pub struct State {
     pub staking_address: CanonicalAddr,
     pub cw20_address: CanonicalAddr,
     pub draw_period: u64,
+    pub next_draw: u64,
     pub total_ust_pool: Uint128,
 }
 

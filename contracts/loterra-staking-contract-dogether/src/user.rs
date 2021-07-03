@@ -19,11 +19,11 @@ pub fn handle_get_ticket(
     _env: Env,
     info: MessageInfo,
     recipient: String,
-    combination: Vec<String>
+    combination: Vec<String>,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if deps.api.addr_canonicalize( info.sender.as_str())? != config.admin {
-        return Err(StdError::generic_err("Not authorized"))
+    if deps.api.addr_canonicalize(info.sender.as_str())? != config.admin {
+        return Err(StdError::generic_err("Not authorized"));
     }
     let holder_addr_raw = deps.api.addr_canonicalize(&recipient.as_str())?;
 
@@ -38,18 +38,18 @@ pub fn handle_get_ticket(
         decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
     let decimals = get_decimals(all_reward_with_decimals).unwrap();
 
-    let rewards = all_reward_with_decimals  * Uint128(1);
+    let rewards = all_reward_with_decimals * Uint128(1);
 
     if rewards.is_zero() {
         return Err(StdError::generic_err("No rewards have accrued yet"));
     }
 
     /*
-        TODO: Query price per tickets on lottery contract
-        TODO: Multiply price per ticket and combination.len()
-        TODO: Check if balance is > combination wanted
-        TODO: Loop combination and check if exist if yes return error if not save to PREFIXED_COMBINATIONS
-     */
+       TODO: Query price per tickets on lottery contract
+       TODO: Multiply price per ticket and combination.len()
+       TODO: Check if balance is > combination wanted
+       TODO: Loop combination and check if exist if yes return error if not save to PREFIXED_COMBINATIONS
+    */
     let new_balance = (state.prev_reward_balance.checked_sub(rewards))?;
     state.prev_reward_balance = new_balance;
     STATE.save(deps.storage, &state)?;
@@ -150,7 +150,7 @@ pub fn handle_unbound(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
-    address: String
+    address: String,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
 
