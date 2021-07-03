@@ -212,8 +212,8 @@ pub fn try_redeem_earning(
         return Err(ContractError::RetryRedeemLater(state.next_draw));
     }
     /*
-       TODO: Multiply with anchor tax
-       TODO: Redeem earning from anchor
+       Multiply with anchor tax
+       Redeem earning from anchor
     */
     let epoch = Anchor::EpochState {
         block_height: None,
@@ -227,15 +227,10 @@ pub fn try_redeem_earning(
         msg: to_binary(&epoch)?,
     };
     let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
-    println!("{}", res.exchange_rate);
-    // TODO: this calculation need decimal256
     let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
-    println!("{}", total_ust_pool);
     let total_with_interest_ust =
         decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
-    println!("{}", total_with_interest_ust);
     let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
-    println!("{}", interest_ust);
     let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
 
     //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
