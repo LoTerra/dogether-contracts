@@ -38,7 +38,7 @@ pub fn handle_get_ticket(
         decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
     let decimals = get_decimals(all_reward_with_decimals).unwrap();
 
-    let rewards = all_reward_with_decimals * Uint128(1);
+    let rewards = all_reward_with_decimals  * Uint128(1);
 
     if rewards.is_zero() {
         return Err(StdError::generic_err("No rewards have accrued yet"));

@@ -1,12 +1,16 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery};
+use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery, Decimal};
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Cw20HookMsg, Anchor, EpochStateResponse};
+use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Anchor, EpochStateResponse};
 use crate::state::{Config, State, CONFIG, STATE, store_config, read_state, read_config, store_state};
 use crate::taxation::deduct_tax;
 use cw20;
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
+use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256};
+use cosmwasm_bignumber::{Decimal256, Uint256};
+use std::ops::{Mul, Sub};
+
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[entry_point]
@@ -145,7 +149,7 @@ pub fn try_un_pool(
     let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount, address: info.sender.to_string()};
     let msg_un_bond = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
-        msg: un_bond.into(),
+        msg: to_binary(&un_bond)?,
         send: vec![]
     };
 
@@ -168,8 +172,8 @@ pub fn try_claim_un_pool(
        TODO: Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
     // Remove UST amount pooled
-    state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
-    store_state(deps.storage, &state)?;
+    //state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
+    //store_state(deps.storage, &state)?;
     Ok(Response::default())
 }
 pub fn try_redeem_earning(
@@ -184,12 +188,14 @@ pub fn try_redeem_earning(
        TODO: Redeem earning from anchor
     */
     let epoch = Anchor::EpochState { block_height: None, distributed_interest: None };
-    let msg_epoch = WasmQuery::Smart { contract_addr: deps.api.addr_humanize(&config.money_market_address)?.to_string(), msg: epoch.into()};
+    let msg_epoch = WasmQuery::Smart { contract_addr: deps.api.addr_humanize(&config.money_market_address)?.to_string(), msg: to_binary(&epoch)?};
     let res :EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
     // TODO: this calculation need decimal256
-    let total_with_interest_ust = Uint128::new(state.total_ust_pool.u128() * res.exchange_rate);
-    let interest_ust = state.total_ust_pool.checked_sub(total_with_interest)?;
-    let interest_a_ust = interest_ust.u128() / res.exchange_rate;
+    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
+    let total_with_interest_ust =decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
+    let interest_ust =
+        decimal_subtraction_in_256(total_ust_pool, total_with_interest_ust);
+    let interest_a_ust = Decimal256::from(interest_ust) / res.exchange_rate;
     /*
        TODO: Calculation difference in stake
     */
@@ -200,7 +206,7 @@ pub fn try_redeem_earning(
     let update_global_index = loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
     let msg_update_global_index = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
-        msg: update_global_index.into(),
+        msg: to_binary(&update_global_index)?,
         send: vec![Coin{ denom: config.denom, amount: Default::default() }]
     };
     Ok(Response{
@@ -256,7 +262,7 @@ mod tests {
             label_staking: "".to_string(),
             money_market_address: "".to_string(),
         };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let info = mock_info("addr0000", &coins(1000, "earth"));
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps, mock_env(), info, msg).unwrap();
     }
@@ -270,25 +276,25 @@ mod tests {
             code_id_staking: 0,
             message_staking: Default::default(),
             label_staking: "".to_string(),
-            money_market_address: "".to_string(),
+            money_market_address: "addr0001".to_string(),
         };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let info = mock_info("addr0000", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
+        //let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        //let value: CountResponse = from_binary(&res).unwrap();
+        //assert_eq!(17, value.count);
     }
 
     #[test]
     fn pool_tokens() {
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
-        let info = mock_info("player", &coins(100, "earth"));
+        let info = mock_info("addr0000", &coins(100, "earth"));
         let env = mock_env();
         let res = try_pool(deps.as_mut(), env, info);
         println!("{:?}", res)
