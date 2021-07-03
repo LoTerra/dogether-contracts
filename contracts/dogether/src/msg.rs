@@ -30,11 +30,32 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Not used to be called directly
-    DepositStable {}
+
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Anchor {
+    /// Deposit stable to anchor
+    DepositStable {},
+    /// Return stable coins to a user
+    /// according to exchange rate
+    RedeemStable {},
+    /// Query Epoch from anchor
+    EpochState {
+        block_height: Option<u64>,
+        distributed_interest: Option<Uint256>,
+    },
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct CountResponse {
     pub count: i32,
+}
+// We define a custom struct for each query response
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct EpochStateResponse {
+    pub exchange_rate: Decimal256,
+    pub aterra_supply: Uint256,
 }

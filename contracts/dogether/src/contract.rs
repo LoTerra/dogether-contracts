@@ -1,10 +1,7 @@
-use cosmwasm_std::{
-    entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-    Uint128, Uint64, WasmMsg,
-};
+use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery};
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Cw20HookMsg, Anchor, EpochStateResponse};
 use crate::state::{Config, State, CONFIG, STATE, store_config, read_state, read_config, store_state};
 use crate::taxation::deduct_tax;
 use cw20;
@@ -84,7 +81,7 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
     /*
        TODO: deposit stable coin to anchor contract
     */
-    let deposit = QueryMsg::DepositStable {};
+    let deposit = Anchor::DepositStable {};
     let deposit_msg = WasmMsg::Execute {
         contract_addr: deps
             .api
@@ -186,7 +183,13 @@ pub fn try_redeem_earning(
        TODO: Multiply with anchor tax
        TODO: Redeem earning from anchor
     */
-
+    let epoch = Anchor::EpochState { block_height: None, distributed_interest: None };
+    let msg_epoch = WasmQuery::Smart { contract_addr: deps.api.addr_humanize(&config.money_market_address)?.to_string(), msg: epoch.into()};
+    let res :EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
+    // TODO: this calculation need decimal256
+    let total_with_interest_ust = Uint128::new(state.total_ust_pool.u128() * res.exchange_rate);
+    let interest_ust = state.total_ust_pool.checked_sub(total_with_interest)?;
+    let interest_a_ust = interest_ust.u128() / res.exchange_rate;
     /*
        TODO: Calculation difference in stake
     */
