@@ -130,6 +130,7 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
     let bond = cw20_base_dogether::msg::ExecuteMsg::Bond {
         contract: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         amount: sent,
+        // TODO: Must use the execute message for a better readability
         msg: Binary::from_base64("eyAiYm9uZF9zdGFrZSI6IHt9IH0=")?,
         recipient: info.sender.to_string(),
     };
@@ -193,6 +194,10 @@ pub fn try_claim_un_pool(
     /*
        TODO: Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
+    /*
+        @burn: un-pool claiming force staking contract to burn the amount of cw20
+        @refund: get the right refund amount of aUst to redeem UST and send UST back to the sender
+     */
     // Remove UST amount pooled
     //state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
     //store_state(deps.storage, &state)?;
