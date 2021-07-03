@@ -8,6 +8,7 @@ pub struct Config {
     pub admin: CanonicalAddr,
     pub denom: String,
     pub money_market_address: CanonicalAddr,
+    pub anchor_aust_address: CanonicalAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

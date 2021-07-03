@@ -33,6 +33,9 @@ pub fn instantiate(
         money_market_address: deps
             .api
             .addr_canonicalize(msg.money_market_address.as_str())?,
+        anchor_aust_address: deps
+            .api
+            .addr_canonicalize(msg.anchor_aust_address.as_str())?,
     };
     store_config(deps.storage, &config)?;
 
@@ -245,6 +248,24 @@ pub fn try_redeem_earning(
     //println!("{}", all_reward_with_decimals);
 
     /*
+           Redeem stable coin from anchor
+     */
+    let redeem = cw20::Cw20ExecuteMsg::Send {
+        contract: deps.api.addr_humanize(&config.money_market_address)?.to_string(),
+        amount: interest_to_withdraw,
+        msg: Some(to_binary(&Anchor::RedeemStable {})?)
+    };
+    let msg_redeem = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&config.anchor_aust_address)?.to_string(),
+        msg: to_binary(&redeem)?,
+        send: vec![]
+    };
+
+
+    // Get the total contract balance and send all ust to staking contract
+    let contract_balance = deps.querier.query_balance(env.contract.address, config.denom.clone())?;
+
+    /*
        Send earning to staking contract
     */
     let update_global_index =
@@ -252,10 +273,13 @@ pub fn try_redeem_earning(
     let msg_update_global_index = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&update_global_index)?,
-        send: vec![Coin {
-            denom: config.denom,
-            amount: interest_to_withdraw,
-        }],
+        send: vec![deduct_tax(
+            &deps.querier,
+            Coin {
+                denom: config.denom,
+                amount: contract_balance.amount,
+            }
+        )?],
     };
 
     state.total_ust_pool = state
@@ -267,7 +291,7 @@ pub fn try_redeem_earning(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![msg_update_global_index.into()],
+        messages: vec![msg_redeem.into(), msg_update_global_index.into()],
         attributes: vec![],
         data: None,
     })
@@ -332,6 +356,7 @@ mod tests {
             message_staking: Default::default(),
             label_staking: "".to_string(),
             money_market_address: "addr0001".to_string(),
+            anchor_aust_address: "addr0007".to_string()
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
         // we can just call .unwrap() to assert this was a success
@@ -348,6 +373,7 @@ mod tests {
             message_staking: Default::default(),
             label_staking: "".to_string(),
             money_market_address: "addr0001".to_string(),
+            anchor_aust_address: "addr0007".to_string()
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
 

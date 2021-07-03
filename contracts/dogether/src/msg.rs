@@ -12,6 +12,7 @@ pub struct InstantiateMsg {
     pub message_staking: Binary,
     pub label_staking: String,
     pub money_market_address: String,
+    pub anchor_aust_address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
