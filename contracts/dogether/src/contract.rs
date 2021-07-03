@@ -297,19 +297,6 @@ pub fn try_redeem_earning(
     })
 }
 
-// calculate the reward with decimal
-fn get_decimals(value: Decimal) -> StdResult<Decimal> {
-    let stringed: &str = &*value.to_string();
-    let parts: &[&str] = &*stringed.split('.').collect::<Vec<&str>>();
-    match parts.len() {
-        1 => Ok(Decimal::zero()),
-        2 => {
-            let decimals = Decimal::from_str(&*("0.".to_owned() + parts[1]))?;
-            Ok(decimals)
-        }
-        _ => Err(StdError::generic_err("Unexpected number of dots")),
-    }
-}
 /*pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         state.count += 1;
