@@ -1,4 +1,4 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery, Decimal};
+use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Uint64, WasmMsg, WasmQuery, Decimal, StdError};
 
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Anchor, EpochStateResponse};
@@ -7,9 +7,10 @@ use crate::taxation::deduct_tax;
 use cw20;
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
-use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256};
+use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256, decimal_div_in_256};
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use std::ops::{Mul, Sub};
+use std::str::FromStr;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -33,7 +34,7 @@ pub fn instantiate(
         staking_address: deps.api.addr_canonicalize("addr0002")?,
         cw20_address: deps.api.addr_canonicalize("addr0003")?,
         draw_period: 0,
-        total_ust_pool: Uint128::zero()
+        total_ust_pool: Uint128(150_000_000_000)
     };
     store_state(deps.storage, &state)?;
 
@@ -200,12 +201,24 @@ pub fn try_redeem_earning(
     let res :EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
     println!("{}", res.exchange_rate);
     // TODO: this calculation need decimal256
-    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(10));
+    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
     println!("{}", total_ust_pool);
-    let total_with_interest_ust =decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
+    let total_with_interest_ust = decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
+    println!("{}", total_with_interest_ust);
     let interest_ust =
-        decimal_subtraction_in_256(total_ust_pool, total_with_interest_ust);
+        decimal_subtraction_in_256 (total_with_interest_ust, total_ust_pool);
+    println!("{}", interest_ust);
     let interest_a_ust = Decimal256::from(interest_ust) / res.exchange_rate;
+        //decimal_div_in_256(interest_ust, res.exchange_rate.into());
+
+    let interest_to_withdraw =Uint256::from(interest_a_ust.0);
+   // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
+    let e = Decimal::from(interest_a_ust.into()) * Uint128(1);
+    println!("{}, {}", interest_to_withdraw, e);
+
+    //println!("{:?}", get_decimals(interest_a_ust));
+    //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
+    //println!("{}", all_reward_with_decimals);
     /*
        TODO: Calculation difference in stake
     */
@@ -225,6 +238,20 @@ pub fn try_redeem_earning(
         attributes: vec![],
         data: None
     })
+}
+
+// calculate the reward with decimal
+fn get_decimals(value: Decimal) -> StdResult<Decimal> {
+    let stringed: &str = &*value.to_string();
+    let parts: &[&str] = &*stringed.split('.').collect::<Vec<&str>>();
+    match parts.len() {
+        1 => Ok(Decimal::zero()),
+        2 => {
+            let decimals = Decimal::from_str(&*("0.".to_owned() + parts[1]))?;
+            Ok(decimals)
+        }
+        _ => Err(StdError::generic_err("Unexpected number of dots")),
+    }
 }
 /*pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
