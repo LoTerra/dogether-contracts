@@ -2,7 +2,7 @@ use cosmwasm_std::{entry_point, to_binary, Binary, Coin, Deps, DepsMut, Env, Mes
 
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Anchor, EpochStateResponse};
-use crate::state::{Config, State, CONFIG, STATE, store_config, read_state, read_config, store_state};
+use crate::state::{Config, State, store_config, read_state, read_config, store_state};
 use crate::taxation::deduct_tax;
 use cw20;
 use cw20_base_dogether;
@@ -28,6 +28,14 @@ pub fn instantiate(
             .addr_canonicalize(msg.money_market_address.as_str())?,
     };
     store_config(deps.storage, &config)?;
+
+    let state = State{
+        staking_address: deps.api.addr_canonicalize("addr0002")?,
+        cw20_address: deps.api.addr_canonicalize("addr0003")?,
+        draw_period: 0,
+        total_ust_pool: Uint128::zero()
+    };
+    store_state(deps.storage, &state)?;
 
     let instantiation_cw20 = WasmMsg::Instantiate {
         admin: None,
@@ -190,8 +198,10 @@ pub fn try_redeem_earning(
     let epoch = Anchor::EpochState { block_height: None, distributed_interest: None };
     let msg_epoch = WasmQuery::Smart { contract_addr: deps.api.addr_humanize(&config.money_market_address)?.to_string(), msg: to_binary(&epoch)?};
     let res :EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
+    println!("{}", res.exchange_rate);
     // TODO: this calculation need decimal256
-    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
+    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(10));
+    println!("{}", total_ust_pool);
     let total_with_interest_ust =decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
     let interest_ust =
         decimal_subtraction_in_256(total_ust_pool, total_with_interest_ust);
@@ -250,7 +260,8 @@ fn query_count(deps: Deps) -> StdResult<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_env, mock_info};
+    use crate::mock_querier::{mock_dependencies};
     use cosmwasm_std::{coins, from_binary};
     fn default_init(deps: DepsMut) {
         let msg = InstantiateMsg {
@@ -260,9 +271,9 @@ mod tests {
             code_id_staking: 0,
             message_staking: Default::default(),
             label_staking: "".to_string(),
-            money_market_address: "".to_string(),
+            money_market_address: "addr0001".to_string(),
         };
-        let info = mock_info("addr0000", &coins(1000, "earth"));
+        let info = mock_info("addr0000", &coins(1000, "uusd"));
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps, mock_env(), info, msg).unwrap();
     }
@@ -278,11 +289,11 @@ mod tests {
             label_staking: "".to_string(),
             money_market_address: "addr0001".to_string(),
         };
-        let info = mock_info("addr0000", &coins(1000, "earth"));
+        let info = mock_info("addr0000", &coins(1000, "uusd"));
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        assert_eq!(2, res.messages.len());
 
         // it worked, let's query the state
         //let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
@@ -294,9 +305,19 @@ mod tests {
     fn pool_tokens() {
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
-        let info = mock_info("addr0000", &coins(100, "earth"));
+        let info = mock_info("addr0000", &coins(100, "uusd"));
         let env = mock_env();
         let res = try_pool(deps.as_mut(), env, info);
+        println!("{:?}", res)
+    }
+
+    #[test]
+    fn redeem_earning() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &coins(100, "uusd"));
+        let env = mock_env();
+        let res = try_redeem_earning(deps.as_mut(), env, info);
         println!("{:?}", res)
     }
 

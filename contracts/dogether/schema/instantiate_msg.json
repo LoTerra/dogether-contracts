@@ -3,12 +3,45 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "count"
+    "code_id_cw20",
+    "code_id_staking",
+    "label_cw20",
+    "label_staking",
+    "message_cw20",
+    "message_staking",
+    "money_market_address"
   ],
   "properties": {
-    "count": {
+    "code_id_cw20": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "code_id_staking": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "label_cw20": {
+      "type": "string"
+    },
+    "label_staking": {
+      "type": "string"
+    },
+    "message_cw20": {
+      "$ref": "#/definitions/Binary"
+    },
+    "message_staking": {
+      "$ref": "#/definitions/Binary"
+    },
+    "money_market_address": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
     }
   }
 }
