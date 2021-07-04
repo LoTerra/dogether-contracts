@@ -261,7 +261,6 @@ pub fn try_redeem_earning(
         send: vec![]
     };
 
-
     // Get the total contract balance and send all ust to staking contract
     let contract_balance = deps.querier.query_balance(env.contract.address, config.denom.clone())?;
 
@@ -333,7 +332,7 @@ mod tests {
     use super::*;
     use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, Empty};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, Empty, Api};
     fn default_init(deps: DepsMut) {
         let msg = InstantiateMsg {
             code_id_cw20: 0,
@@ -386,7 +385,7 @@ mod tests {
 
     #[test]
     fn redeem_earning() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[Coin{ denom: "uusd".to_string(), amount: Uint128(7_500_000_000)}]);
         default_init(deps.as_mut());
         // Sending funds error
         let info = mock_info("addr0000", &coins(100, "uusd"));
@@ -411,14 +410,25 @@ mod tests {
 
         let update_global_index =
             loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
+        let redeem = cw20::Cw20ExecuteMsg::Send {
+            contract: "addr0001".to_string(),
+            amount: Uint128(7_142_857_142),
+            msg: Some(to_binary(&Anchor::RedeemStable {}).unwrap())
+        };
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            vec![
+                CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "addr0007".to_string(),
+                msg: to_binary(&redeem).unwrap(),
+                send: vec![]
+            }),
+                CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: "addr0002".to_string(),
                 msg: to_binary(&update_global_index).unwrap(),
                 send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128(7142857142)
+                    amount: Uint128(7_499_000_000)
                 }]
             })]
         )
