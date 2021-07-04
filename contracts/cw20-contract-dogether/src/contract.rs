@@ -556,7 +556,7 @@ mod tests {
             _ => panic!("Do not enter here"),
         }
 
-        // Error not the authorized minter
+        // Success
         let info = mock_info("minter00", &[]);
         let msg = ExecuteMsg::Bond {
             contract: "staking".to_string(),
