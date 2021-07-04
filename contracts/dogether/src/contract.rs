@@ -156,25 +156,21 @@ pub fn try_un_pool(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Option<Uint128>,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
     /*
-       TODO: Query staking contract in order to check the user balance
+       We should probably query staking contract in order to check the user balance ?
     */
-    /*let un_pool_amount  = match amount {
-        None => {}
-        Some(amount) => Some(amount)
-    }; */
     if amount.is_zero() {
         return Err(ContractError::EmptyAmount {});
     }
     /*
-       TODO: Call staking contract in order to init unPool with un-bonding period
+       Call staking contract in order to init unPool with un-bonding period
     */
     let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake {
-        amount: un_pool_amount,
+        amount,
         address: info.sender.to_string(),
     };
     let msg_un_bond = WasmMsg::Execute {
@@ -193,22 +189,33 @@ pub fn try_un_pool(
 
 pub fn try_claim_un_pool(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
     /*
-       TODO: Call staking contract in order to withdrawal unPool with un-bonding period succeed
+       Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
     /*
        @burn: un-pool claiming force staking contract to burn the amount of cw20
        @refund: get the right refund amount of aUst to redeem UST and send UST back to the sender
     */
+    let withdraw = loterra_staking_contract_dogether::msg::ExecuteMsg::WithdrawStake { cap: None, address: info.sender.to_string() };
+    let withdraw_msg = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
+        msg: to_binary(&withdraw)?,
+        send: vec![]
+    };
     // Remove UST amount pooled
-    //state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
-    //store_state(deps.storage, &state)?;
-    Ok(Response::default())
+    state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
+    store_state(deps.storage, &state)?;
+    Ok(Response {
+        submessages: vec![withdraw_msg.into()],
+        messages: vec![],
+        attributes: vec![],
+        data: None
+    })
 }
 pub fn try_redeem_earning(
     deps: DepsMut,

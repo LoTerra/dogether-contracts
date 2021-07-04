@@ -205,9 +205,10 @@ pub fn handle_withdraw_stake(
     env: Env,
     info: MessageInfo,
     cap: Option<Uint128>,
+    address: String
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    let address_raw = deps.api.addr_canonicalize(&info.sender.as_str())?;
+    let address_raw = deps.api.addr_canonicalize(&address.as_str())?;
 
     let amount = claim_tokens(deps.storage, address_raw, &env.block, cap)?;
     if amount.is_zero() {
@@ -216,13 +217,12 @@ pub fn handle_withdraw_stake(
 
     let cw20_human_addr = deps.api.addr_humanize(&config.cw20_token_addr)?;
 
-    let cw20_transfer_msg = Cw20ExecuteMsg::Transfer {
-        recipient: info.sender.to_string(),
+    let cw20_burn_msg = Cw20ExecuteMsg::Burn {
         amount,
     };
     let msg = WasmMsg::Execute {
         contract_addr: cw20_human_addr.to_string(),
-        msg: to_binary(&cw20_transfer_msg)?,
+        msg: to_binary(&cw20_burn_msg)?,
         send: vec![],
     };
 

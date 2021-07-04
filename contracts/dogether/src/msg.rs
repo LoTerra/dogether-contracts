@@ -21,7 +21,7 @@ pub enum ExecuteMsg {
     /// Pool UST to anchor yield in order to get automated ticket with earning
     Pool {},
     /// UnPool tokens and get back UST, un-bonding period required!
-    UnPool { amount: Option<Uint128> },
+    UnPool { amount: Uint128 },
     /// Withdraw unPool tokens after un-bonding period succeed
     ClaimUnPool {},
     /// Redeem earning from anchor
