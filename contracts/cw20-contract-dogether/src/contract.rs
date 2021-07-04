@@ -8,11 +8,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::{BalanceResponse, Cw20Coin, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
-use crate::allowances::{
-    execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
-    execute_transfer_from, query_allowance,
-};
-use crate::enumerable::{query_all_accounts, query_all_allowances};
+use crate::enumerable::query_all_accounts;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
@@ -123,14 +119,14 @@ pub fn execute_bond(
     )?;
 
     let attrs = vec![
-        attr("action", "send"),
+        attr("action", "bond"),
         attr("from", &info.sender),
         attr("to", &contract),
         attr("amount", amount),
     ];
 
     // create a send message
-    let msg = Cw20ReceiveMsg {
+    let msg_two = Cw20ReceiveMsg {
         sender: recipient,
         amount,
         msg,
@@ -139,7 +135,7 @@ pub fn execute_bond(
 
     let res = Response {
         submessages: vec![],
-        messages: vec![msg],
+        messages: vec![msg_two],
         attributes: attrs,
         data: None,
     };
@@ -189,14 +185,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
-        QueryMsg::Allowance { owner, spender } => {
-            to_binary(&query_allowance(deps, owner, spender)?)
-        }
-        QueryMsg::AllAllowances {
-            owner,
-            start_after,
-            limit,
-        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
         QueryMsg::AllAccounts { start_after, limit } => {
             to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
@@ -237,7 +225,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, from_binary, Attribute, CosmosMsg, Empty, StdError, WasmMsg};
 
     use super::*;
 
@@ -409,89 +397,6 @@ mod tests {
     }
 
     #[test]
-    fn can_mint_by_minter() {
-        let mut deps = mock_dependencies(&[]);
-
-        let genesis = String::from("genesis");
-        let amount = Uint128(11223344);
-        let minter = String::from("asmodat");
-        let limit = Uint128(511223344);
-        do_instantiate_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
-
-        // minter can mint coins to some winner
-        let winner = String::from("lucky");
-        let prize = Uint128(222_222_222);
-        let msg = ExecuteMsg::Mint {
-            recipient: winner.clone(),
-            amount: prize,
-        };
-
-        let info = mock_info(minter.as_ref(), &[]);
-        let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(get_balance(deps.as_ref(), genesis), amount);
-        assert_eq!(get_balance(deps.as_ref(), winner.clone()), prize);
-
-        // but cannot mint nothing
-        let msg = ExecuteMsg::Mint {
-            recipient: winner.clone(),
-            amount: Uint128::zero(),
-        };
-        let info = mock_info(minter.as_ref(), &[]);
-        let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
-
-        // but if it exceeds cap (even over multiple rounds), it fails
-        // cap is enforced
-        let msg = ExecuteMsg::Mint {
-            recipient: winner,
-            amount: Uint128(333_222_222),
-        };
-        let info = mock_info(minter.as_ref(), &[]);
-        let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::CannotExceedCap {});
-    }
-
-    #[test]
-    fn others_cannot_mint() {
-        let mut deps = mock_dependencies(&[]);
-        do_instantiate_with_minter(
-            deps.as_mut(),
-            &String::from("genesis"),
-            Uint128(1234),
-            &String::from("minter"),
-            None,
-        );
-
-        let msg = ExecuteMsg::Mint {
-            recipient: String::from("lucky"),
-            amount: Uint128(222),
-        };
-        let info = mock_info("anyone else", &[]);
-        let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {});
-    }
-
-    #[test]
-    fn no_one_mints_if_minter_unset() {
-        let mut deps = mock_dependencies(&[]);
-        do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128(1234));
-
-        let msg = ExecuteMsg::Mint {
-            recipient: String::from("lucky"),
-            amount: Uint128(222),
-        };
-        let info = mock_info("genesis", &[]);
-        let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {});
-    }
-
-    #[test]
     fn instantiate_multiple_accounts() {
         let mut deps = mock_dependencies(&[]);
         let amount1 = Uint128::from(11223344u128);
@@ -570,66 +475,6 @@ mod tests {
     }
 
     #[test]
-    fn transfer() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
-        let addr2 = String::from("addr0002");
-        let amount1 = Uint128::from(12340000u128);
-        let transfer = Uint128::from(76543u128);
-        let too_much = Uint128::from(12340321u128);
-
-        do_instantiate(deps.as_mut(), &addr1, amount1);
-
-        // cannot transfer nothing
-        let info = mock_info(addr1.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Transfer {
-            recipient: addr2.clone(),
-            amount: Uint128::zero(),
-        };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
-
-        // cannot send more than we have
-        let info = mock_info(addr1.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Transfer {
-            recipient: addr2.clone(),
-            amount: too_much,
-        };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
-
-        // cannot send from empty account
-        let info = mock_info(addr2.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Transfer {
-            recipient: addr1.clone(),
-            amount: transfer,
-        };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
-
-        // valid transfer
-        let info = mock_info(addr1.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Transfer {
-            recipient: addr2.clone(),
-            amount: transfer,
-        };
-        let res = execute(deps.as_mut(), env, info, msg).unwrap();
-        assert_eq!(res.messages.len(), 0);
-
-        let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
-        assert_eq!(get_balance(deps.as_ref(), addr2), transfer);
-        assert_eq!(
-            query_token_info(deps.as_ref()).unwrap().total_supply,
-            amount1
-        );
-    }
-
-    #[test]
     fn burn() {
         let mut deps = mock_dependencies(&coins(2, "token"));
         let addr1 = String::from("addr0001");
@@ -679,76 +524,55 @@ mod tests {
     }
 
     #[test]
-    fn send() {
+    fn bond() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = String::from("addr0001");
-        let contract = String::from("addr0002");
-        let amount1 = Uint128::from(12340000u128);
-        let transfer = Uint128::from(76543u128);
-        let too_much = Uint128::from(12340321u128);
-        let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
+        do_instantiate_with_minter(deps.as_mut(), "minter00", Uint128::zero(), "minter00", None);
 
-        do_instantiate(deps.as_mut(), &addr1, amount1);
-
-        // cannot send nothing
-        let info = mock_info(addr1.as_ref(), &[]);
+        let info = mock_info("addr0001", &[]);
         let env = mock_env();
-        let msg = ExecuteMsg::Send {
-            contract: contract.clone(),
+        let msg = ExecuteMsg::Bond {
+            contract: "staking".to_string(),
             amount: Uint128::zero(),
-            msg: send_msg.clone(),
+            msg: Default::default(),
+            recipient: "provider".to_string(),
         };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
-
-        // cannot send more than we have
-        let info = mock_info(addr1.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Send {
-            contract: contract.clone(),
-            amount: too_much,
-            msg: send_msg.clone(),
-        };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
-
-        // valid transfer
-        let info = mock_info(addr1.as_ref(), &[]);
-        let env = mock_env();
-        let msg = ExecuteMsg::Send {
-            contract: contract.clone(),
-            amount: transfer,
-            msg: send_msg.clone(),
-        };
-        let res = execute(deps.as_mut(), env, info, msg).unwrap();
-        assert_eq!(res.messages.len(), 1);
-
-        // ensure proper send message sent
-        // this is the message we want delivered to the other side
-        let binary_msg = Cw20ReceiveMsg {
-            sender: addr1.clone(),
-            amount: transfer,
-            msg: send_msg,
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        // Error zero amount sent
+        match res {
+            Err(ContractError::InvalidZeroAmount {}) => {}
+            _ => panic!("Do not enter here"),
         }
-        .into_binary()
-        .unwrap();
-        // and this is how it must be wrapped for the vm to process it
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: contract.clone(),
-                msg: binary_msg,
-                send: vec![],
-            })
-        );
 
-        // ensure balance is properly transferred
-        let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
-        assert_eq!(get_balance(deps.as_ref(), contract), transfer);
-        assert_eq!(
-            query_token_info(deps.as_ref()).unwrap().total_supply,
-            amount1
-        );
+        let msg = ExecuteMsg::Bond {
+            contract: "staking".to_string(),
+            amount: Uint128(1_000_000),
+            msg: Default::default(),
+            recipient: "provider".to_string(),
+        };
+        // Error not the authorized minter
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Do not enter here"),
+        }
+
+        // Error not the authorized minter
+        let info = mock_info("minter00", &[]);
+        let msg = ExecuteMsg::Bond {
+            contract: "staking".to_string(),
+            amount: Uint128(1_000_000),
+            msg: Default::default(),
+            recipient: "provider".to_string(),
+        };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        println!("{:?}", res);
+        let msg = Cw20ReceiveMsg {
+            sender: "provider".to_string(),
+            amount: Uint128(1_000_000),
+            msg: Default::default(),
+        }
+        .into_cosmos_msg("staking")
+        .unwrap();
+        assert_eq!(res.messages, vec![msg]);
     }
 }

@@ -85,18 +85,6 @@ pub enum QueryMsg {
     /// Returns who can mint and how much.
     /// Return type: MinterResponse.
     Minter {},
-    /// Only with "allowance" extension.
-    /// Returns how much spender can use from owner account, 0 if unset.
-    /// Return type: AllowanceResponse.
-    Allowance { owner: String, spender: String },
-    /// Only with "enumerable" extension (and "allowances")
-    /// Returns all allowances this owner has approved. Supports pagination.
-    /// Return type: AllAllowancesResponse.
-    AllAllowances {
-        owner: String,
-        start_after: Option<String>,
-        limit: Option<u32>,
-    },
     /// Only with "enumerable" extension
     /// Returns all accounts that have balances. Supports pagination.
     /// Return type: AllAccountsResponse.
