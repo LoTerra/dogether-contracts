@@ -225,7 +225,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Attribute, CosmosMsg, Empty, StdError, WasmMsg};
+    use cosmwasm_std::{coins, from_binary, Attribute, CosmosMsg, Empty, StdError, WasmMsg, Api, Addr};
 
     use super::*;
 
@@ -550,7 +550,7 @@ mod tests {
             recipient: "provider".to_string(),
         };
         // Error not the authorized minter
-        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
         match res {
             Err(ContractError::Unauthorized {}) => {}
             _ => panic!("Do not enter here"),
@@ -564,7 +564,7 @@ mod tests {
             msg: Default::default(),
             recipient: "provider".to_string(),
         };
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         println!("{:?}", res);
         let msg = Cw20ReceiveMsg {
             sender: "provider".to_string(),
@@ -574,5 +574,9 @@ mod tests {
         .into_cosmos_msg("staking")
         .unwrap();
         assert_eq!(res.messages, vec![msg]);
+        let state = TOKEN_INFO.load(deps.as_ref().storage).unwrap();
+        assert_eq!(state.total_supply, Uint128(1_000_000));
+        let holder = BALANCES.load(deps.as_ref().storage, &Addr::unchecked("staking")).unwrap();
+        assert_eq!(holder, Uint128(1_000_000));
     }
 }
