@@ -156,10 +156,17 @@ pub fn try_un_pool(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Uint128,
+    amount: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
+    /*
+       TODO: Query staking contract in order to check the user balance
+    */
+    /*let un_pool_amount  = match amount {
+        None => {}
+        Some(amount) => Some(amount)
+    }; */
     if amount.is_zero() {
         return Err(ContractError::EmptyAmount {});
     }
@@ -167,7 +174,7 @@ pub fn try_un_pool(
        TODO: Call staking contract in order to init unPool with un-bonding period
     */
     let un_bond = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake {
-        amount,
+        amount: un_pool_amount,
         address: info.sender.to_string(),
     };
     let msg_un_bond = WasmMsg::Execute {
