@@ -184,7 +184,7 @@ pub fn try_un_pool(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
-    let config = read_config(deps.storage)?;
+    let _config = read_config(deps.storage)?;
     /*
        We should probably query staking contract in order to check the user balance ?
     */
@@ -479,6 +479,10 @@ pub fn withdraw_reply(
             let amount = Uint128::from(withdrawing_amount.parse::<u128>().unwrap());
             state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
             store_state(deps.storage, &state)?;
+
+            /*
+                TODO: Calculation of aUST amount and withdraw from anchor.
+             */
 
             Ok(Response {
                 submessages: vec![],
