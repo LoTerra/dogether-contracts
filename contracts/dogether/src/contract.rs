@@ -105,7 +105,7 @@ pub fn execute(
         ExecuteMsg::RedeemEarning {} => try_redeem_earning(deps, env, info),
     }
 }
-pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
 
@@ -120,7 +120,7 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
         _ => Err(ContractError::MultipleDenoms {}),
     }?;
     /*
-       TODO: deposit stable coin to anchor contract
+       Deposit stable coin to anchor contract
     */
     let deposit = Anchor::DepositStable {};
     let deposit_msg = WasmMsg::Execute {
@@ -179,7 +179,7 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
 }
 pub fn try_un_pool(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -481,8 +481,8 @@ pub fn withdraw_reply(
             store_state(deps.storage, &state)?;
 
             /*
-                TODO: Calculation of aUST amount and withdraw from anchor.
-             */
+               TODO: Calculation of aUST amount and withdraw from anchor.
+            */
 
             Ok(Response {
                 submessages: vec![],
