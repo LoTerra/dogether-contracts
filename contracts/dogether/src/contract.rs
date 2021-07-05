@@ -21,7 +21,7 @@ use std::str::FromStr;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -91,7 +91,7 @@ pub fn instantiate(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -378,7 +378,7 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     })?;
     Ok(Response::default())
 }*/
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     match msg.id {
         0 => cw20_instance_reply(deps, env, msg.result),
@@ -498,7 +498,7 @@ pub fn withdraw_reply(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         _ => Ok(Default::default()),

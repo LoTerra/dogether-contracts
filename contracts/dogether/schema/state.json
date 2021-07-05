@@ -5,6 +5,7 @@
   "required": [
     "cw20_address",
     "draw_period",
+    "next_draw",
     "staking_address",
     "total_ust_pool"
   ],
@@ -13,6 +14,11 @@
       "$ref": "#/definitions/CanonicalAddr"
     },
     "draw_period": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "next_draw": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

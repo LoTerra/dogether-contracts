@@ -3,21 +3,32 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
+    "anchor_aust_address",
     "code_id_cw20",
     "code_id_staking",
+    "draw_period",
     "label_cw20",
     "label_staking",
     "message_cw20",
     "message_staking",
-    "money_market_address"
+    "money_market_address",
+    "next_draw"
   ],
   "properties": {
+    "anchor_aust_address": {
+      "type": "string"
+    },
     "code_id_cw20": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
     "code_id_staking": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "draw_period": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
@@ -36,6 +47,11 @@
     },
     "money_market_address": {
       "type": "string"
+    },
+    "next_draw": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     }
   },
   "definitions": {
