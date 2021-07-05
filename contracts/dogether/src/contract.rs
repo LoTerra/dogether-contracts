@@ -1,8 +1,4 @@
-use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg,
-    Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult,
-    SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
-};
+use cosmwasm_std::{attr, entry_point, to_binary, BankMsg, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg, Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery, ReplyOn};
 
 use crate::error::ContractError;
 use crate::math::{
@@ -61,7 +57,7 @@ pub fn instantiate(
         id: msg.code_id_cw20,
         msg: cosmos_msg_cw20,
         gas_limit: None,
-        reply_on: Default::default(),
+        reply_on: ReplyOn::Success,
     };
     let instantiation_staking = WasmMsg::Instantiate {
         admin: None,
@@ -75,7 +71,7 @@ pub fn instantiate(
         id: msg.code_id_staking,
         msg: cosmos_msg_staking,
         gas_limit: None,
-        reply_on: Default::default(),
+        reply_on: ReplyOn::Success,
     };
 
     Ok(Response {
@@ -240,7 +236,7 @@ pub fn try_claim_un_pool(
         id: 2,
         msg: cosmos_msg,
         gas_limit: None,
-        reply_on: Default::default(),
+        reply_on: ReplyOn::Success,
     };
 
     // Remove UST amount pooled
@@ -579,7 +575,7 @@ mod tests {
     use super::*;
     use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event};
+    use cosmwasm_std::{coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event, ReplyOn};
     use cw20::Cw20ExecuteMsg;
 
     fn default_init(deps: DepsMut) {
@@ -701,7 +697,84 @@ mod tests {
             ]
         )
     }
+    #[test]
+    fn un_pool(){
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let env = mock_env();
+        // Instantiate contract staking
+        let rep = Reply {
+            id: 1,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "staking")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
 
+        let msg = ExecuteMsg::UnPool { amount: Uint128(1_000) };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        let un_bond_msg = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake { amount:  Uint128(1_000), address: "addr0000".to_string() };
+        println!("{:?}", res);
+
+        assert_eq!(res.messages, vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "staking".to_string(),
+            msg: to_binary(&un_bond_msg).unwrap(),
+            send: vec![]
+        })]);
+
+        let msg = ExecuteMsg::UnPool { amount: Uint128(0) };
+        let res = execute(deps.as_mut(), env, info, msg);
+        match res {
+           Err(ContractError::EmptyAmount {}) => {}
+            _ => panic!("Do not enter here")
+        }
+    }
+    #[test]
+    fn claim_un_pool(){
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let env = mock_env();
+        // Instantiate contract staking
+        let rep = Reply {
+            id: 1,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "staking")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
+
+        let res = try_claim_un_pool(deps.as_mut(), env, info).unwrap();
+        println!("{:?}", res);
+        let msg = loterra_staking_contract_dogether::msg::ExecuteMsg::WithdrawStake { cap: None, address: "addr0000".to_string() };
+        let wasm_msg = WasmMsg::Execute {
+            contract_addr: "staking".to_string(),
+            msg: to_binary(&msg).unwrap(),
+            send: vec![]
+        };
+        let submessage = SubMsg{
+            id: 2,
+            msg: CosmosMsg::Wasm(wasm_msg),
+            gas_limit: None,
+            reply_on: ReplyOn::Success
+        };
+        assert_eq!(res, Response{
+            submessages: vec![submessage],
+            messages: vec![],
+            attributes: vec![],
+            data: None
+        })
+    }
     #[test]
     fn redeem_earning() {
         let mut deps = mock_dependencies(&[Coin {
