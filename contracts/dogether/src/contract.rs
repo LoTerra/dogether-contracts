@@ -478,7 +478,7 @@ pub fn withdraw_reply(
                 messages: vec![],
                 attributes: vec![
                     attr("withdraw", withdrawing_amount),
-                    attr("state", "success"),
+                    attr("status", "success"),
                 ],
                 data: None,
             })
@@ -637,7 +637,7 @@ mod tests {
             result: ContractResult::Ok(SubcallResponse {
                 events: vec![Event {
                     kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "addr0009")],
+                    attributes: vec![attr("contract_address", "cw20")],
                 }],
                 data: None,
             }),
@@ -646,7 +646,7 @@ mod tests {
         let state = read_state(deps.as_ref().storage).unwrap();
         assert_eq!(
             state.cw20_address,
-            deps.api.addr_canonicalize("addr0009").unwrap()
+            deps.api.addr_canonicalize("cw20").unwrap()
         );
         assert_ne!(state_before.cw20_address, state.cw20_address);
         let d = deps.api.addr_humanize(&state_before.cw20_address).unwrap();
@@ -657,8 +657,84 @@ mod tests {
                 submessages: vec![],
                 messages: vec![],
                 attributes: vec![
-                    attr("cw20-address", "addr0009"),
+                    attr("cw20-address", "cw20"),
                     attr("cw20-instantiate", "success")
+                ],
+                data: None
+            }
+        )
+    }
+
+    #[test]
+    fn reply_staking_instantiated() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let mut env = mock_env();
+        let state_before = read_state(deps.as_ref().storage).unwrap();
+        let rep = Reply {
+            id: 1,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "staking")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env, rep).unwrap();
+        let state = read_state(deps.as_ref().storage).unwrap();
+        assert_eq!(
+            state.staking_address,
+            deps.api.addr_canonicalize("staking").unwrap()
+        );
+        assert_ne!(state_before.staking_address, state.staking_address);
+        let d = deps.api.addr_humanize(&state_before.staking_address).unwrap();
+
+        assert_eq!(
+            res,
+            Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("staking-address", "staking"),
+                    attr("staking-instantiate", "success")
+                ],
+                data: None
+            }
+        )
+    }
+
+    #[test]
+    fn reply_withdrawal() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let mut env = mock_env();
+        let state_before = read_state(deps.as_ref().storage).unwrap();
+        let rep = Reply {
+            id: 2,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "message".to_string(),
+                    attributes: vec![attr("withdraw", "100000000000")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env, rep).unwrap();
+        let state = read_state(deps.as_ref().storage).unwrap();
+        assert_ne!(state.total_ust_pool, state_before.total_ust_pool);
+        assert_eq!(state.total_ust_pool, state_before.total_ust_pool.checked_sub(Uint128(100_000_000_000)).unwrap());
+        println!("{:?}", res);
+        assert_eq!(
+            res,
+            Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("withdraw", "100000000000"),
+                    attr("status", "success")
                 ],
                 data: None
             }
