@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg, Decimal,
-    Deps, DepsMut, Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult, SubMsg,
-    SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, BankMsg, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg,
+    Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult,
+    SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
@@ -344,10 +344,6 @@ pub fn try_redeem_earning(
         )?],
     };
 
-    state.total_ust_pool = state
-        .total_ust_pool
-        .checked_sub(interest_to_withdraw)
-        .unwrap();
     state.next_draw = env.block.height.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
 
@@ -459,36 +455,105 @@ pub fn staking_instance_reply(
 
 pub fn withdraw_reply(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     msg: ContractResult<SubcallResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
+    let config = read_config(deps.storage)?;
     match msg {
         ContractResult::Ok(subcall) => {
-            let withdrawing_amount = subcall
+            let (withdrawing_amount, recipient) = subcall
                 .events
                 .into_iter()
                 .find(|e| e.kind == "message")
                 .and_then(|ev| {
-                    ev.attributes
+                    let amount = ev
+                        .attributes
+                        .clone()
                         .into_iter()
                         .find(|attr| attr.key == "withdraw")
-                        .and_then(|withdraw| Some(withdraw.value))
+                        .and_then(|withdraw| Some(withdraw.value));
+                    let recipient = ev
+                        .attributes
+                        .into_iter()
+                        .find(|attr| attr.key == "recipient")
+                        .and_then(|recipient| Some(recipient.value));
+                    Some((amount, recipient))
                 })
                 .unwrap();
-            let amount = Uint128::from(withdrawing_amount.parse::<u128>().unwrap());
-            state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
-            store_state(deps.storage, &state)?;
+            let amount_to_withdraw =
+                Uint128::from(withdrawing_amount.unwrap().parse::<u128>().unwrap());
 
             /*
-               TODO: Calculation of aUST amount and withdraw from anchor.
+               Calculation of aUST amount and withdraw from anchor.
             */
+            let epoch = Anchor::EpochState {
+                block_height: None,
+                distributed_interest: None,
+            };
+            let msg_epoch = WasmQuery::Smart {
+                contract_addr: deps
+                    .api
+                    .addr_humanize(&config.money_market_address)?
+                    .to_string(),
+                msg: to_binary(&epoch)?,
+            };
+            let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
+            let total_ust_pool = Decimal::from_ratio(amount_to_withdraw, Uint128(1));
+            let interest_a_ust_decimal =
+                Decimal256::from_ratio(Decimal256::from(total_ust_pool).0, res.exchange_rate.0);
+            let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
 
+            /*
+                Redeem stable coin from anchor
+            */
+            let redeem = cw20::Cw20ExecuteMsg::Send {
+                contract: deps
+                    .api
+                    .addr_humanize(&config.money_market_address)?
+                    .to_string(),
+                amount: interest_to_withdraw,
+                msg: Some(to_binary(&Anchor::RedeemStable {})?),
+            };
+            let msg_redeem = WasmMsg::Execute {
+                contract_addr: deps
+                    .api
+                    .addr_humanize(&config.anchor_aust_address)?
+                    .to_string(),
+                msg: to_binary(&redeem)?,
+                send: vec![],
+            };
+            // Get the total contract balance and send ust
+            let contract_balance = deps
+                .querier
+                .query_balance(env.contract.address, config.denom.clone())?;
+
+            if contract_balance.amount >= amount_to_withdraw {
+                return Err(ContractError::NotEnoughFunds {});
+            }
+
+            state.total_ust_pool = state
+                .total_ust_pool
+                .checked_sub(amount_to_withdraw)
+                .unwrap();
+            store_state(deps.storage, &state)?;
+
+            let net_amount = deduct_tax(
+                &deps.querier,
+                Coin {
+                    denom: config.denom.clone(),
+                    amount: amount_to_withdraw,
+                },
+            )?;
+            let bank_msg = CosmosMsg::Bank(BankMsg::Send {
+                to_address: recipient.unwrap(),
+                amount: vec![net_amount.clone()],
+            });
             Ok(Response {
                 submessages: vec![],
-                messages: vec![],
+                messages: vec![msg_redeem.into(), bank_msg],
                 attributes: vec![
-                    attr("withdraw", withdrawing_amount),
+                    attr("withdraw", net_amount.amount),
                     attr("status", "success"),
                 ],
                 data: None,
@@ -515,6 +580,8 @@ mod tests {
     use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event};
+    use cw20::Cw20ExecuteMsg;
+
     fn default_init(deps: DepsMut) {
         let msg = InstantiateMsg {
             code_id_cw20: 0,
@@ -685,7 +752,7 @@ mod tests {
         let res = try_redeem_earning(deps.as_mut(), env.clone(), info).unwrap();
         let state = read_state(deps.as_ref().storage).unwrap();
         println!("{:?}", res);
-        assert!(state_before.total_ust_pool > state.total_ust_pool);
+        assert_eq!(state_before.total_ust_pool, state.total_ust_pool);
         assert!(state_before.next_draw < state.next_draw);
         assert_eq!(state.next_draw, env.block.height + state.draw_period);
         assert_eq!(state_before.draw_period, state.draw_period);
@@ -833,7 +900,10 @@ mod tests {
             result: ContractResult::Ok(SubcallResponse {
                 events: vec![Event {
                     kind: "message".to_string(),
-                    attributes: vec![attr("withdraw", "100000000000")],
+                    attributes: vec![
+                        attr("withdraw", "100000000000"),
+                        attr("recipient", "addr0008"),
+                    ],
                 }],
                 data: None,
             }),
@@ -851,12 +921,29 @@ mod tests {
                 .unwrap()
         );
         println!("{:?}", res);
+        let msg_to = Cw20ExecuteMsg::Send {
+            contract: "money".to_string(),
+            amount: Uint128(95_238_095_238),
+            msg: Some(to_binary(&Anchor::RedeemStable {}).unwrap()),
+        };
+        let wasm_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "aust".to_string(),
+            msg: to_binary(&msg_to).unwrap(),
+            send: vec![],
+        });
+        let cosmos_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: "addr0008".to_string(),
+            amount: vec![Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128(99_999_000_000),
+            }],
+        });
         assert_eq!(
             res,
             Response {
                 submessages: vec![],
-                messages: vec![],
-                attributes: vec![attr("withdraw", "100000000000"), attr("status", "success")],
+                messages: vec![wasm_msg, cosmos_msg],
+                attributes: vec![attr("withdraw", "99999000000"), attr("status", "success")],
                 data: None
             }
         )

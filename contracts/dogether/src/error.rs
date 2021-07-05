@@ -26,6 +26,9 @@ pub enum ContractError {
 
     #[error("Do not send funds")]
     DoNotSendFunds {},
+
+    #[error("Not enough funds")]
+    NotEnoughFunds {},
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
 }
