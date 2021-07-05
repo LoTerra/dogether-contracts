@@ -225,7 +225,9 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Attribute, CosmosMsg, Empty, StdError, WasmMsg, Api, Addr};
+    use cosmwasm_std::{
+        coins, from_binary, Addr, Api, Attribute, CosmosMsg, Empty, StdError, WasmMsg,
+    };
 
     use super::*;
 
@@ -576,7 +578,9 @@ mod tests {
         assert_eq!(res.messages, vec![msg]);
         let state = TOKEN_INFO.load(deps.as_ref().storage).unwrap();
         assert_eq!(state.total_supply, Uint128(1_000_000));
-        let holder = BALANCES.load(deps.as_ref().storage, &Addr::unchecked("staking")).unwrap();
+        let holder = BALANCES
+            .load(deps.as_ref().storage, &Addr::unchecked("staking"))
+            .unwrap();
         assert_eq!(holder, Uint128(1_000_000));
     }
 }

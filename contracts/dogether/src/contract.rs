@@ -1,6 +1,7 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128, Uint64, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, Binary, Coin, ContractResult, CosmosMsg, Decimal, Deps, DepsMut,
+    Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, SubcallResponse,
+    Uint128, Uint64, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
@@ -55,7 +56,13 @@ pub fn instantiate(
         send: vec![],
         label: msg.label_cw20,
     };
-
+    let cosmos_msg_cw20 = CosmosMsg::Wasm(instantiation_cw20);
+    let sub_msg_cw20 = SubMsg {
+        id: msg.code_id_cw20,
+        msg: cosmos_msg_cw20,
+        gas_limit: None,
+        reply_on: Default::default(),
+    };
     let instantiation_staking = WasmMsg::Instantiate {
         admin: None,
         code_id: msg.code_id_staking,
@@ -63,11 +70,22 @@ pub fn instantiate(
         send: vec![],
         label: msg.label_staking,
     };
+    let cosmos_msg_staking = CosmosMsg::Wasm(instantiation_staking);
+    let sub_msg_staking = SubMsg {
+        id: msg.code_id_staking,
+        msg: cosmos_msg_staking,
+        gas_limit: None,
+        reply_on: Default::default(),
+    };
 
     Ok(Response {
-        submessages: vec![],
-        messages: vec![instantiation_cw20.into(), instantiation_staking.into()],
-        attributes: vec![],
+        submessages: vec![sub_msg_cw20, sub_msg_staking],
+        messages: vec![],
+        attributes: vec![
+            attr("instantiate", "Dogether"),
+            attr("instantiate_cw20", "Dogether cw20"),
+            attr("instantiate_staking", "Dogether staking"),
+        ],
         data: None,
     })
 }
@@ -201,20 +219,32 @@ pub fn try_claim_un_pool(
        @burn: un-pool claiming force staking contract to burn the amount of cw20
        @refund: get the right refund amount of aUst to redeem UST and send UST back to the sender
     */
-    let withdraw = loterra_staking_contract_dogether::msg::ExecuteMsg::WithdrawStake { cap: None, address: info.sender.to_string() };
+    let withdraw = loterra_staking_contract_dogether::msg::ExecuteMsg::WithdrawStake {
+        cap: None,
+        address: info.sender.to_string(),
+    };
     let withdraw_msg = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&withdraw)?,
-        send: vec![]
+        send: vec![],
     };
+    let cosmos_msg = CosmosMsg::Wasm(withdraw_msg);
+
+    let sub_msg = SubMsg {
+        id: 2,
+        msg: cosmos_msg,
+        gas_limit: None,
+        reply_on: Default::default(),
+    };
+
     // Remove UST amount pooled
-    state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
-    store_state(deps.storage, &state)?;
+    //state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
+    // store_state(deps.storage, &state)?;
     Ok(Response {
-        submessages: vec![withdraw_msg.into()],
+        submessages: vec![sub_msg],
         messages: vec![],
         attributes: vec![],
-        data: None
+        data: None,
     })
 }
 pub fn try_redeem_earning(
@@ -250,12 +280,16 @@ pub fn try_redeem_earning(
     let total_with_interest_ust =
         decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
     let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
-    let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
-
+    //let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
+    //println!("{}", interest_a_ust_decimal);
+    let interest_a_ust_decimal =
+        Decimal256::from_ratio(Decimal256::from(interest_ust).0, res.exchange_rate.0);
+    println!("{}", interest_a_ust_decimal);
     //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
     // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
+    //decimal_summation_in_256(interest_ust, Decimal::from_ratio(interest_ust, res.exchange_rate));
     let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
-    //println!("{}, {}", interest_to_withdraw, e);
+    println!("{}", interest_to_withdraw);
 
     //println!("{:?}", get_decimals(interest_a_ust));
     //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
@@ -337,6 +371,121 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     })?;
     Ok(Response::default())
 }*/
+#[entry_point]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
+    match msg.id {
+        0 => cw20_instance_reply(deps, env, msg.result),
+        1 => staking_instance_reply(deps, env, msg.result),
+        2 => withdraw_reply(deps, env, msg.result),
+        _ => Err(ContractError::Unauthorized {}),
+    }
+}
+
+pub fn cw20_instance_reply(
+    deps: DepsMut,
+    _env: Env,
+    msg: ContractResult<SubcallResponse>,
+) -> Result<Response, ContractError> {
+    let mut state = read_state(deps.storage)?;
+    match msg {
+        ContractResult::Ok(subcall) => {
+            let contract_address = subcall
+                .events
+                .into_iter()
+                .find(|e| e.kind == "instantiate_contract")
+                .and_then(|ev| {
+                    ev.attributes
+                        .into_iter()
+                        .find(|attr| attr.key == "contract_address")
+                        .and_then(|addr| Some(addr.value))
+                })
+                .unwrap();
+            state.cw20_address = deps.api.addr_canonicalize(&contract_address.as_str())?;
+            store_state(deps.storage, &state)?;
+            Ok(Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("cw20-address", contract_address),
+                    attr("cw20-instantiate", "success"),
+                ],
+                data: None,
+            })
+        }
+        ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
+    }
+}
+pub fn staking_instance_reply(
+    deps: DepsMut,
+    _env: Env,
+    msg: ContractResult<SubcallResponse>,
+) -> Result<Response, ContractError> {
+    let mut state = read_state(deps.storage)?;
+    match msg {
+        ContractResult::Ok(subcall) => {
+            let contract_address = subcall
+                .events
+                .into_iter()
+                .find(|e| e.kind == "instantiate_contract")
+                .and_then(|ev| {
+                    ev.attributes
+                        .into_iter()
+                        .find(|attr| attr.key == "contract_address")
+                        .and_then(|addr| Some(addr.value))
+                })
+                .unwrap();
+            state.staking_address = deps.api.addr_canonicalize(&contract_address.as_str())?;
+            store_state(deps.storage, &state)?;
+            Ok(Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("staking-address", contract_address),
+                    attr("staking-instantiate", "success"),
+                ],
+                data: None,
+            })
+        }
+        ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
+    }
+}
+
+pub fn withdraw_reply(
+    deps: DepsMut,
+    _env: Env,
+    msg: ContractResult<SubcallResponse>,
+) -> Result<Response, ContractError> {
+    let mut state = read_state(deps.storage)?;
+    match msg {
+        ContractResult::Ok(subcall) => {
+            let withdrawing_amount = subcall
+                .events
+                .into_iter()
+                .find(|e| e.kind == "message")
+                .and_then(|ev| {
+                    ev.attributes
+                        .into_iter()
+                        .find(|attr| attr.key == "withdraw")
+                        .and_then(|withdraw| Some(withdraw.value))
+                })
+                .unwrap();
+            let amount = Uint128::from(withdrawing_amount.parse::<u128>().unwrap());
+            state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
+            store_state(deps.storage, &state)?;
+
+            Ok(Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("withdraw", withdrawing_amount),
+                    attr("state", "success"),
+                ],
+                data: None,
+            })
+        }
+        ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
+    }
+}
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -354,7 +503,7 @@ mod tests {
     use super::*;
     use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Api, CosmosMsg, Empty};
+    use cosmwasm_std::{coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event};
     fn default_init(deps: DepsMut) {
         let msg = InstantiateMsg {
             code_id_cw20: 0,
@@ -476,6 +625,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn reply_cw20_instantiated() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let info = mock_info("addr0000", &[]);
+        let mut env = mock_env();
+        let state_before = read_state(deps.as_ref().storage).unwrap();
+        let rep = Reply {
+            id: 0,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "addr0009")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env, rep).unwrap();
+        let state = read_state(deps.as_ref().storage).unwrap();
+        assert_eq!(
+            state.cw20_address,
+            deps.api.addr_canonicalize("addr0009").unwrap()
+        );
+        assert_ne!(state_before.cw20_address, state.cw20_address);
+        let d = deps.api.addr_humanize(&state_before.cw20_address).unwrap();
+
+        assert_eq!(
+            res,
+            Response {
+                submessages: vec![],
+                messages: vec![],
+                attributes: vec![
+                    attr("cw20-address", "addr0009"),
+                    attr("cw20-instantiate", "success")
+                ],
+                data: None
+            }
+        )
+    }
     /* #[test]
     fn increment() {
         let mut deps = mock_dependencies(&coins(2, "token"));
