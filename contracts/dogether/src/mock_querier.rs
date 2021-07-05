@@ -58,7 +58,7 @@ impl WasmMockQuerier {
     pub fn handle_query(&self, request: &QueryRequest<TerraQueryWrapper>) -> QuerierResult {
         match &request {
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
-                if contract_addr == "addr0001" {
+                if contract_addr == "money" {
                     let d = Decimal::percent(105);
                     let res = EpochResponse {
                         exchange_rate: Decimal256::from(d),

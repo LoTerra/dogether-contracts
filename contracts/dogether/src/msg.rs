@@ -13,6 +13,8 @@ pub struct InstantiateMsg {
     pub label_staking: String,
     pub money_market_address: String,
     pub anchor_aust_address: String,
+    pub next_draw: u64,
+    pub draw_period: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

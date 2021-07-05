@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Binary, Coin, ContractResult, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, SubcallResponse,
-    Uint128, Uint64, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg, Decimal,
+    Deps, DepsMut, Env, Fraction, MessageInfo, Reply, Response, StdError, StdResult, SubMsg,
+    SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
@@ -41,11 +41,11 @@ pub fn instantiate(
     store_config(deps.storage, &config)?;
 
     let state = State {
-        staking_address: deps.api.addr_canonicalize("addr0002")?,
-        cw20_address: deps.api.addr_canonicalize("addr0003")?,
-        draw_period: 100,
-        next_draw: 1000,
-        total_ust_pool: Uint128(150_000_000_000),
+        staking_address: deps.api.addr_canonicalize(info.sender.as_str())?,
+        cw20_address: deps.api.addr_canonicalize(info.sender.as_str())?,
+        draw_period: msg.draw_period,
+        next_draw: msg.next_draw,
+        total_ust_pool: Uint128::zero(),
     };
     store_state(deps.storage, &state)?;
 
@@ -132,7 +132,7 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
         send: vec![deduct_tax(
             &deps.querier,
             Coin {
-                denom: config.denom,
+                denom: config.denom.clone(),
                 amount: sent,
             },
         )?],
@@ -148,13 +148,20 @@ pub fn try_pool(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, 
 
     let bond = cw20_base_dogether::msg::ExecuteMsg::Bond {
         contract: deps.api.addr_humanize(&state.staking_address)?.to_string(),
-        amount: sent,
+        amount: deduct_tax(
+            &deps.querier,
+            Coin {
+                denom: config.denom,
+                amount: sent,
+            },
+        )?
+        .amount,
         msg: to_binary(&loterra_staking_contract_dogether::msg::ReceiveMsg::BondStake {})?,
         recipient: info.sender.to_string(),
     };
 
     let bond_msg = WasmMsg::Execute {
-        contract_addr: "".to_string(),
+        contract_addr: deps.api.addr_humanize(&state.cw20_address)?.to_string(),
         msg: to_binary(&bond)?,
         send: vec![],
     };
@@ -211,7 +218,6 @@ pub fn try_claim_un_pool(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
-    let config = read_config(deps.storage)?;
     /*
        Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
@@ -253,6 +259,7 @@ pub fn try_redeem_earning(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
+
     let config = read_config(deps.storage)?;
     if !info.funds.is_empty() {
         return Err(ContractError::DoNotSendFunds {});
@@ -512,8 +519,10 @@ mod tests {
             code_id_staking: 0,
             message_staking: Default::default(),
             label_staking: "".to_string(),
-            money_market_address: "addr0001".to_string(),
-            anchor_aust_address: "addr0007".to_string(),
+            money_market_address: "money".to_string(),
+            anchor_aust_address: "aust".to_string(),
+            next_draw: 1000,
+            draw_period: 100,
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
         // we can just call .unwrap() to assert this was a success
@@ -529,14 +538,16 @@ mod tests {
             code_id_staking: 0,
             message_staking: Default::default(),
             label_staking: "".to_string(),
-            money_market_address: "addr0001".to_string(),
-            anchor_aust_address: "addr0007".to_string(),
+            money_market_address: "money".to_string(),
+            anchor_aust_address: "aust".to_string(),
+            next_draw: 100,
+            draw_period: 1000,
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(2, res.messages.len());
+        assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
         //let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
@@ -548,10 +559,76 @@ mod tests {
     fn pool_tokens() {
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
-        let info = mock_info("addr0000", &coins(100, "uusd"));
+        let info = mock_info("addr0000", &[]);
         let env = mock_env();
         let res = try_pool(deps.as_mut(), env, info);
-        println!("{:?}", res)
+        println!("{:?}", res);
+        match res {
+            Err(ContractError::EmptyFunds {}) => {}
+            _ => panic!("Do not enter here"),
+        }
+
+        let info = mock_info("addr0000", &coins(100, "uusd"));
+        let env = mock_env();
+        // Instantiate contract cw20
+        let rep = Reply {
+            id: 0,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "cw20")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
+        // Instantiate contract staking
+        let rep = Reply {
+            id: 1,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "staking")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
+
+        // Try pool
+        let res = try_pool(deps.as_mut(), env, info.clone()).unwrap();
+        println!("{:?}", res);
+        let state = read_state(deps.as_ref().storage).unwrap();
+        let deposit = Anchor::DepositStable {};
+        let bond = cw20_base_dogether::msg::ExecuteMsg::Bond {
+            contract: deps
+                .api
+                .addr_humanize(&state.staking_address)
+                .unwrap()
+                .to_string(),
+            amount: Uint128(99),
+            msg: to_binary(&loterra_staking_contract_dogether::msg::ReceiveMsg::BondStake {})
+                .unwrap(),
+            recipient: info.sender.to_string(),
+        };
+        assert_eq!(
+            res.messages,
+            vec![
+                CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: "money".to_string(),
+                    msg: to_binary(&deposit).unwrap(),
+                    send: vec![Coin {
+                        denom: "uusd".to_string(),
+                        amount: Uint128(99)
+                    }]
+                }),
+                CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: "cw20".to_string(),
+                    msg: to_binary(&bond).unwrap(),
+                    send: vec![]
+                })
+            ]
+        )
     }
 
     #[test]
@@ -561,9 +638,38 @@ mod tests {
             amount: Uint128(7_500_000_000),
         }]);
         default_init(deps.as_mut());
+        let mut state = read_state(deps.as_ref().storage).unwrap();
+        state.total_ust_pool = Uint128(150_000_000_000);
+        store_state(deps.as_mut().storage, &state).unwrap();
         // Sending funds error
         let info = mock_info("addr0000", &coins(100, "uusd"));
         let env = mock_env();
+        // Instantiate contract cw20
+        let rep = Reply {
+            id: 0,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "cw20")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
+        // Instantiate contract staking
+        let rep = Reply {
+            id: 1,
+            result: ContractResult::Ok(SubcallResponse {
+                events: vec![Event {
+                    kind: "instantiate_contract".to_string(),
+                    attributes: vec![attr("contract_address", "staking")],
+                }],
+                data: None,
+            }),
+        };
+        let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
+
+        // try redeem
         let res = try_redeem_earning(deps.as_mut(), env, info);
         match res {
             Err(ContractError::DoNotSendFunds {}) => {}
@@ -585,7 +691,7 @@ mod tests {
         let update_global_index =
             loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
         let redeem = cw20::Cw20ExecuteMsg::Send {
-            contract: "addr0001".to_string(),
+            contract: "money".to_string(),
             amount: Uint128(7_142_857_142),
             msg: Some(to_binary(&Anchor::RedeemStable {}).unwrap()),
         };
@@ -593,12 +699,12 @@ mod tests {
             res.messages,
             vec![
                 CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "addr0007".to_string(),
+                    contract_addr: "aust".to_string(),
                     msg: to_binary(&redeem).unwrap(),
                     send: vec![]
                 }),
                 CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "addr0002".to_string(),
+                    contract_addr: "staking".to_string(),
                     msg: to_binary(&update_global_index).unwrap(),
                     send: vec![Coin {
                         denom: "uusd".to_string(),
@@ -689,7 +795,10 @@ mod tests {
             deps.api.addr_canonicalize("staking").unwrap()
         );
         assert_ne!(state_before.staking_address, state.staking_address);
-        let d = deps.api.addr_humanize(&state_before.staking_address).unwrap();
+        let d = deps
+            .api
+            .addr_humanize(&state_before.staking_address)
+            .unwrap();
 
         assert_eq!(
             res,
@@ -711,7 +820,10 @@ mod tests {
         default_init(deps.as_mut());
         let info = mock_info("addr0000", &[]);
         let mut env = mock_env();
-        let state_before = read_state(deps.as_ref().storage).unwrap();
+        let mut state_before = read_state(deps.as_ref().storage).unwrap();
+        state_before.total_ust_pool = Uint128(150_000_000_000);
+        store_state(deps.as_mut().storage, &state_before).unwrap();
+
         let rep = Reply {
             id: 2,
             result: ContractResult::Ok(SubcallResponse {
@@ -722,20 +834,25 @@ mod tests {
                 data: None,
             }),
         };
+
         let res = reply(deps.as_mut(), env, rep).unwrap();
+
         let state = read_state(deps.as_ref().storage).unwrap();
         assert_ne!(state.total_ust_pool, state_before.total_ust_pool);
-        assert_eq!(state.total_ust_pool, state_before.total_ust_pool.checked_sub(Uint128(100_000_000_000)).unwrap());
+        assert_eq!(
+            state.total_ust_pool,
+            state_before
+                .total_ust_pool
+                .checked_sub(Uint128(100_000_000_000))
+                .unwrap()
+        );
         println!("{:?}", res);
         assert_eq!(
             res,
             Response {
                 submessages: vec![],
                 messages: vec![],
-                attributes: vec![
-                    attr("withdraw", "100000000000"),
-                    attr("status", "success")
-                ],
+                attributes: vec![attr("withdraw", "100000000000"), attr("status", "success")],
                 data: None
             }
         )
