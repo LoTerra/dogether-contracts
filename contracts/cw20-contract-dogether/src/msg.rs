@@ -1,5 +1,5 @@
 use cosmwasm_std::{Binary, StdError, StdResult, Uint128};
-use cw20::{Cw20Coin, Expiration, MinterResponse};
+use cw20::{Cw20Coin, MinterResponse};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

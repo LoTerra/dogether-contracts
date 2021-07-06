@@ -1,7 +1,7 @@
 use cosmwasm_std::{Deps, Order, StdResult};
-use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
+use cw20::AllAccountsResponse;
 
-use crate::state::{ALLOWANCES, BALANCES};
+use crate::state::BALANCES;
 use cw_storage_plus::Bound;
 
 // settings for pagination
