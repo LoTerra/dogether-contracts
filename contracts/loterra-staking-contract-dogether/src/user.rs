@@ -3,10 +3,7 @@ use crate::state::{
     STATE,
 };
 
-use cosmwasm_std::{
-    attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
-};
+use cosmwasm_std::{attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery, Fraction};
 
 use crate::claim::{claim_tokens, create_claim};
 use crate::math::{
@@ -25,7 +22,6 @@ pub fn handle_get_ticket(
     recipient: String,
     combination: Vec<String>,
 ) -> StdResult<Response> {
-    println!("{}", combination.len());
     if combination.is_empty() {
         return Err(StdError::generic_err("No combination found"));
     }
@@ -40,9 +36,11 @@ pub fn handle_get_ticket(
 
     let all_reward_with_decimals =
         decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
+
     let decimals = get_decimals(all_reward_with_decimals).unwrap();
 
     let rewards = all_reward_with_decimals * Uint128(1);
+    println!("{:?} dd", decimal_summation_in_256(Decimal::from_ratio(Uint128(2), Uint128(1)), holder.pending_rewards));
 
     if rewards.is_zero() {
         return Err(StdError::generic_err("No rewards have accrued yet"));
@@ -125,10 +123,14 @@ pub fn handle_get_ticket(
     let new_balance = (state
         .prev_reward_balance
         .checked_sub(total_ticket_with_fees))?;
+
     state.prev_reward_balance = new_balance;
     STATE.save(deps.storage, &state)?;
 
-    holder.pending_rewards = decimals;
+    /*
+        Calculation pending rewards adding new decimals
+     */
+    holder.pending_rewards = Decimal::from_ratio(rewards.checked_sub(total_ticket_with_fees).unwrap(), Uint128(1));
     holder.index = state.global_index;
     store_holder(deps.storage, &holder_addr_raw, &holder)?;
 

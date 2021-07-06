@@ -31,7 +31,7 @@ mod tests {
         ConfigResponse, ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg,
         ReceiveMsg, StateResponse,
     };
-    use crate::state::{store_holder, Holder, State, STATE};
+    use crate::state::{store_holder, Holder, State, STATE, read_holder};
     use crate::testing;
     use crate::testing::mock_querier::{
         mock_dependencies, MOCK_CW20_CONTRACT_ADDR, MOCK_HUB_CONTRACT_ADDR,
@@ -416,8 +416,6 @@ mod tests {
             recipient: Addr::unchecked("addr0000").to_string(),
             combination: vec![
                 "123456".to_string(),
-                "123457".to_string(),
-                "123458".to_string(),
             ],
         };
         let info = mock_info("addr0000", &[]);
@@ -426,8 +424,6 @@ mod tests {
             address: Some("addr0000".to_string()),
             combination: vec![
                 "123456".to_string(),
-                "123457".to_string(),
-                "123458".to_string(),
             ],
         };
         assert_eq!(
@@ -437,17 +433,19 @@ mod tests {
                 msg: to_binary(&withdraw_msg).unwrap(),
                 send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128(3)
+                    amount: Uint128(1)
                 }]
             })]
         );
+        let mut holder: Holder = read_holder(deps.as_ref().storage, &deps.api.addr_canonicalize(&"addr0000").unwrap()).unwrap();
+        println!("{} hhhhh", holder.pending_rewards);
 
         // Too much ticket and not enough balance
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        let msg = ExecuteMsg::UpdateGlobalIndex {};
-        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        //let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
+        //let msg = ExecuteMsg::UpdateGlobalIndex {};
+        //execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
