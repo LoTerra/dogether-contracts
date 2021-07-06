@@ -52,6 +52,7 @@ mod tests {
     fn default_init() -> InstantiateMsg {
         InstantiateMsg {
             cw20_token_addr: Addr::unchecked(MOCK_CW20_CONTRACT_ADDR),
+            loterra_addr: Addr::unchecked("loterra".to_string()),
             reward_denom: DEFAULT_REWARD_DENOM.to_string(),
             unbonding_period: 1000,
         }
@@ -73,7 +74,7 @@ mod tests {
         let init_msg = default_init();
         let env = mock_env();
         let info = MessageInfo {
-            sender: Addr::unchecked("ok"),
+            sender: Addr::unchecked("addr0000"),
             funds: vec![],
         };
         let res = instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
@@ -412,8 +413,8 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec!["123456".to_string(), "123456".to_string(), "123456".to_string()],
         };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
