@@ -1,5 +1,9 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{from_slice, to_binary, Addr, Api, BalanceResponse, BankQuery, Binary, Coin, ContractResult, Decimal, OwnedDeps, Querier, QuerierResult, QueryRequest, Response, StdError, StdResult, SystemError, SystemResult, Uint128, WasmQuery, CanonicalAddr};
+use cosmwasm_std::{
+    from_slice, to_binary, Addr, Api, BalanceResponse, BankQuery, Binary, CanonicalAddr, Coin,
+    ContractResult, Decimal, OwnedDeps, Querier, QuerierResult, QueryRequest, Response, StdError,
+    StdResult, SystemError, SystemResult, Uint128, WasmQuery,
+};
 use std::str::FromStr;
 use terra_cosmwasm::{
     ExchangeRateItem, ExchangeRatesResponse, TaxCapResponse, TaxRateResponse, TerraQuery,
@@ -47,7 +51,7 @@ impl WasmMockQuerier {
         match &request {
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
                 if contract_addr == &"loterra".to_string() {
-                    let res = loterra::msg::ConfigResponse{
+                    let res = loterra::msg::ConfigResponse {
                         admin: CanonicalAddr(to_binary(&"o").unwrap()),
                         block_time_play: 0,
                         every_block_time_play: 0,
@@ -65,7 +69,7 @@ impl WasmMockQuerier {
                         loterra_staking_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
                         safe_lock: false,
                         lottery_counter: 0,
-                        holders_bonus_block_time_end: 0
+                        holders_bonus_block_time_end: 0,
                     };
                     return SystemResult::Ok(ContractResult::from(to_binary(&res)));
                 }

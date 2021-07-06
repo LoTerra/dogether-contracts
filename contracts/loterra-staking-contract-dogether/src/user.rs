@@ -27,7 +27,7 @@ pub fn handle_get_ticket(
 ) -> StdResult<Response> {
     println!("{}", combination.len());
     if combination.is_empty() {
-        return Err(StdError::generic_err("No combination found"))
+        return Err(StdError::generic_err("No combination found"));
     }
     let holder_addr_raw = deps.api.addr_canonicalize(&recipient.as_str())?;
 
@@ -64,22 +64,36 @@ pub fn handle_get_ticket(
     };
     let query_loterra: loterra::msg::ConfigResponse = deps.querier.query(&msg_query.into())?;
     let price_per_ticket = query_loterra.price_per_ticket_to_register;
+    // Total ticket cost
     let total_ticket_cost = Uint128(price_per_ticket.u128() * combination.len() as u128);
+    // Total ticket cost minus fees
     let total_ticket_cost_net = deduct_tax(
-        &deps.querier,Coin{ denom: config.reward_denom.clone(), amount: total_ticket_cost })?.amount;
-    println!("{}", total_ticket_cost);
+        &deps.querier,
+        Coin {
+            denom: config.reward_denom.clone(),
+            amount: total_ticket_cost,
+        },
+    )?
+    .amount;
+    // Total network fees
+    let total_fee = total_ticket_cost
+        .checked_sub(total_ticket_cost_net)
+        .unwrap();
+    // Total ticket cost + fees summation
+    let total_ticket_with_fees = total_ticket_cost.checked_add(total_fee).unwrap();
+
     // Check if enough rewards to buy tickets
-    if rewards < total_ticket_cost.checked_add(total_ticket_cost.checked_sub(total_ticket_cost_net).unwrap()).unwrap() {
+    if rewards < total_ticket_with_fees {
         return Err(StdError::generic_err(format!(
-            "Not enough funds, you want to buy {}UST tickets and you have {}UST",
-            total_ticket_cost, rewards
+            "Not enough funds, you want to buy {}UST + {}UST network fees tickets and you only have {}UST",
+            total_ticket_cost, total_fee, rewards
         )));
     }
 
     /*
        Check if it is the more efficient way to check combination exist
     */
-    combination.clone().into_iter().map(|combo| {
+    for combo in combination.clone() {
         match PREFIXED_COMBINATIONS.may_load(
             deps.storage,
             (
@@ -99,17 +113,18 @@ pub fn handle_get_ticket(
                     &combo,
                 )?;
             }
-            Some(_) =>{
-            return Err(StdError::generic_err(format!(
-                "Combination {} already exist",
-                combo
-            )));},
+            Some(_) => {
+                return Err(StdError::generic_err(format!(
+                    "Combination {} already exist",
+                    combo
+                )));
+            }
         }
-        Ok(())
-    });
+    }
 
-
-    let new_balance = (state.prev_reward_balance.checked_sub(total_ticket_cost))?;
+    let new_balance = (state
+        .prev_reward_balance
+        .checked_sub(total_ticket_with_fees))?;
     state.prev_reward_balance = new_balance;
     STATE.save(deps.storage, &state)?;
 
@@ -117,12 +132,20 @@ pub fn handle_get_ticket(
     holder.index = state.global_index;
     store_holder(deps.storage, &holder_addr_raw, &holder)?;
 
-    let msg_loterra = loterra::msg::ExecuteMsg::Register { address: Some(recipient.clone()), combination: combination.clone() };
+    let msg_loterra = loterra::msg::ExecuteMsg::Register {
+        address: Some(recipient.clone()),
+        combination: combination.clone(),
+    };
     let execute = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
         msg: to_binary(&msg_loterra)?,
         send: vec![deduct_tax(
-            &deps.querier,Coin{ denom: config.reward_denom, amount: total_ticket_cost })?]
+            &deps.querier,
+            Coin {
+                denom: config.reward_denom,
+                amount: total_ticket_with_fees,
+            },
+        )?],
     };
 
     Ok(Response {

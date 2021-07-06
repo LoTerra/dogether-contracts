@@ -375,7 +375,7 @@ mod tests {
     fn claim_rewards() {
         let mut deps = mock_dependencies(&[Coin {
             denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128(100u128),
+            amount: Uint128(4u128),
         }]);
 
         let init_msg = default_init();
@@ -384,7 +384,7 @@ mod tests {
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
-        let receive_msg = receive_stake_msg("addr0000", 100);
+        let receive_msg = receive_stake_msg("addr0000", 4);
         execute(deps.as_mut(), env.clone(), info, receive_msg).unwrap();
         let res = query(
             deps.as_ref(),
@@ -400,7 +400,7 @@ mod tests {
             holder_response,
             HolderResponse {
                 address: "addr0000".to_string(),
-                balance: Uint128::from(100u128),
+                balance: Uint128::from(4u128),
                 index: Decimal::zero(),
                 pending_rewards: Decimal::zero(),
             }
@@ -414,23 +414,35 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string(), "123456".to_string(), "123456".to_string()],
+            combination: vec![
+                "123456".to_string(),
+                "123457".to_string(),
+                "123458".to_string(),
+            ],
         };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
+        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
+            address: Some("addr0000".to_string()),
+            combination: vec![
+                "123456".to_string(),
+                "123457".to_string(),
+                "123458".to_string(),
+            ],
+        };
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr0000".to_string(),
-                amount: vec![Coin {
+            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "loterra".to_string(),
+                msg: to_binary(&withdraw_msg).unwrap(),
+                send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128::from(99u128), // 1% tax
-                },]
+                    amount: Uint128(3)
+                }]
             })]
         );
 
-        // Set recipient
+        // Too much ticket and not enough balance
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
@@ -438,21 +450,20 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec![
+                "223456".to_string(),
+                "223457".to_string(),
+                "223458".to_string(),
+                "223459".to_string(),
+            ],
         };
         let info = mock_info("addr0000", &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        assert_eq!(
-            res.messages,
-            vec![CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr0001".to_string(),
-                amount: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128::from(99u128), // 1% tax
-                },]
-            })]
-        );
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        match res {
+            Err(StdError::GenericErr {msg, ..}) => assert_eq!(msg, "Not enough funds, you want to buy 4UST + 1UST network fees tickets and you only have 4UST"),
+            _ => panic!("Do not enter here")
+        }
     }
 
     #[test]
