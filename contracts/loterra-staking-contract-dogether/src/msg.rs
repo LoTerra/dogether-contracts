@@ -7,6 +7,7 @@ use cw20::Cw20ReceiveMsg;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub cw20_token_addr: Addr,
+    pub loterra_addr: Addr,
     pub reward_denom: String,
     pub unbonding_period: u64,
 }

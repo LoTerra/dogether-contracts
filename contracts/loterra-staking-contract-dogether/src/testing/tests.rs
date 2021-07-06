@@ -319,6 +319,7 @@ mod tests {
 
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
+            address: "addr7777".to_string(),
         };
 
         // Failed underflow
@@ -344,6 +345,7 @@ mod tests {
         let info = mock_info("addr0000", &[]);
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
+            address: "addr7777".to_string(),
         };
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -409,7 +411,10 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -431,8 +436,9 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards {
-            recipient: Some(Addr::unchecked("addr0001").to_string()),
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
         };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
@@ -490,7 +496,10 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         assert_eq!(
@@ -507,13 +516,17 @@ mod tests {
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
+            address: "addr7777".to_string(),
         };
         let info = mock_info("addr0000", &[]);
         env.block.height = 5;
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         // withdraw before unbonding fails
-        let msg = ExecuteMsg::WithdrawStake { cap: None };
+        let msg = ExecuteMsg::WithdrawStake {
+            cap: None,
+            address: "addr7777".to_string(),
+        };
         let info = mock_info("addr0000", &[]);
         env.block.height = 10;
         let res = execute(deps.as_mut(), env.clone(), info, msg);
@@ -526,7 +539,10 @@ mod tests {
         }
 
         // withdraw works after unbonding period
-        let msg = ExecuteMsg::WithdrawStake { cap: None };
+        let msg = ExecuteMsg::WithdrawStake {
+            cap: None,
+            address: "addr7777".to_string(),
+        };
         let info = mock_info("addr0000", &[]);
         env.block.height = 10000;
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
@@ -587,7 +603,10 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         assert_eq!(
@@ -604,6 +623,7 @@ mod tests {
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
+            address: "addr7777".to_string(),
         };
         let info = mock_info("addr0000", &[]);
         env.block.height = 5;
@@ -612,6 +632,7 @@ mod tests {
         // cap is less then release, wait for more to unbond
         let msg = ExecuteMsg::WithdrawStake {
             cap: Some(Uint128::from(50u128)),
+            address: "addr7777".to_string(),
         };
         let info = mock_info("addr0000", &[]);
         env.block.height = 100000;
@@ -626,6 +647,7 @@ mod tests {
 
         let msg = ExecuteMsg::WithdrawStake {
             cap: Some(Uint128::from(150u128)),
+            address: "addr7777".to_string(),
         };
         let info = mock_info("addr0000", &[]);
         env.block.height = 100000;
@@ -686,7 +708,10 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
         assert_eq!(
@@ -941,15 +966,24 @@ mod tests {
         )
         .unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0000", &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0001", &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::ClaimRewards { recipient: None };
+        let msg = ExecuteMsg::GetTicket {
+            recipient: Addr::unchecked("addr0001").to_string(),
+            combination: vec![],
+        };
         let info = mock_info("addr0002", &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 

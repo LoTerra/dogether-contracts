@@ -22,6 +22,7 @@ pub fn instantiate(
     let conf = Config {
         admin: deps.api.addr_canonicalize(info.sender.as_str())?,
         cw20_token_addr: deps.api.addr_canonicalize(&msg.cw20_token_addr.as_str())?,
+        loterra_addr: deps.api.addr_canonicalize(&msg.loterra_addr.as_str())?,
         reward_denom: msg.reward_denom,
         unbonding_period: msg.unbonding_period,
     };

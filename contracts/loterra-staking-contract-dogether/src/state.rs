@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub admin: CanonicalAddr,
     pub cw20_token_addr: CanonicalAddr,
+    pub loterra_addr: CanonicalAddr,
     pub reward_denom: String,
     pub unbonding_period: u64,
 }
@@ -92,4 +93,4 @@ fn calc_range_start(api: &dyn Api, start_after: Option<Addr>) -> StdResult<Optio
     }
 }
 
-pub const PREFIXED_COMBINATIONS: Map<(&[u8], &[u8]), Vec<CanonicalAddr>> = Map::new("combinations");
+pub const PREFIXED_COMBINATIONS: Map<(&[u8], &[u8], &[u8]), String> = Map::new("combinations");

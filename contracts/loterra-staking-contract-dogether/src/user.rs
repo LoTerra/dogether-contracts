@@ -1,8 +1,11 @@
-use crate::state::{read_holder, read_holders, store_holder, Config, Holder, State, CONFIG, STATE};
+use crate::state::{
+    read_holder, read_holders, store_holder, Config, Holder, State, CONFIG, PREFIXED_COMBINATIONS,
+    STATE,
+};
 
 use cosmwasm_std::{
     attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Uint128, WasmMsg,
+    Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::claim::{claim_tokens, create_claim};
@@ -12,6 +15,7 @@ use crate::math::{
 use crate::msg::{AccruedRewardsResponse, HolderResponse, HoldersResponse, ReceiveMsg};
 use crate::taxation::deduct_tax;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, Expiration};
+use loterra;
 use std::str::FromStr;
 
 pub fn handle_get_ticket(
@@ -22,9 +26,7 @@ pub fn handle_get_ticket(
     combination: Vec<String>,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if deps.api.addr_canonicalize(info.sender.as_str())? != config.admin {
-        return Err(StdError::generic_err("Not authorized"));
-    }
+
     let holder_addr_raw = deps.api.addr_canonicalize(&recipient.as_str())?;
 
     let mut holder: Holder = read_holder(deps.storage, &holder_addr_raw)?;
@@ -45,11 +47,60 @@ pub fn handle_get_ticket(
     }
 
     /*
-       TODO: Query price per tickets on lottery contract
-       TODO: Multiply price per ticket and combination.len()
-       TODO: Check if balance is > combination wanted
-       TODO: Loop combination and check if exist if yes return error if not save to PREFIXED_COMBINATIONS
+       Query price per tickets on lottery contract
+       Multiply price per ticket and combination.len()
+       Check if balance is > combination wanted
+       Loop combination and check if exist if yes return error if not save to PREFIXED_COMBINATIONS
     */
+    /*
+       Query the price per tickets
+    */
+    let query = loterra::msg::QueryMsg::Config {};
+    let msg_query = WasmQuery::Smart {
+        contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
+        msg: to_binary(&query)?,
+    };
+    let loterra_query: loterra::msg::ConfigResponse = deps.querier.query(msg_query.into())?;
+    let price_per_ticket = loterra_query.price_per_ticket_to_register;
+    let total_ticket_cost = combination.len() * price_per_ticket.u128();
+    // Check if enough rewards to buy tickets
+    if rewards < total_ticket_cost {
+        return Err(StdError::generic_err(format!(
+            "Not enough funds, you want to buy {}UST tickets and you have {}UST",
+            total_ticket_cost, rewards
+        )));
+    }
+
+    /*
+       Check if it is the more efficient way to check combination exist
+    */
+    combination.into_iter().map(|combo| {
+        match PREFIXED_COMBINATIONS.may_load(
+            deps.storage,
+            (
+                &loterra_query.lottery_counter.to_be_bytes(),
+                &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                &combo.as_bytes(),
+            ),
+        )? {
+            None => {
+                PREFIXED_COMBINATIONS.save(
+                    deps.storage,
+                    (
+                        &loterra_query.lottery_counter.to_be_bytes(),
+                        &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                        &combo.as_bytes(),
+                    ),
+                    &combo,
+                )?;
+            }
+            Some(_) => Err(StdError::generic_err(format!(
+                "Combination {} already exist",
+                combo
+            ))),
+        };
+    });
+
     let new_balance = (state.prev_reward_balance.checked_sub(rewards))?;
     state.prev_reward_balance = new_balance;
     STATE.save(deps.storage, &state)?;
