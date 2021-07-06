@@ -230,8 +230,8 @@ pub fn handle_withdraw_stake(
         data: None,
         attributes: vec![
             attr("action", "withdraw_stake"),
-            attr("holder_address", &info.sender),
-            attr("amount", amount),
+            attr("recipient", address),
+            attr("withdraw", amount),
         ],
     })
 }
