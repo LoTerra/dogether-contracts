@@ -31,7 +31,7 @@ mod tests {
         ConfigResponse, ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg,
         ReceiveMsg, StateResponse,
     };
-    use crate::state::{store_holder, Holder, State, STATE, read_holder};
+    use crate::state::{read_holder, store_holder, Holder, State, STATE};
     use crate::testing;
     use crate::testing::mock_querier::{
         mock_dependencies, MOCK_CW20_CONTRACT_ADDR, MOCK_HUB_CONTRACT_ADDR,
@@ -318,7 +318,7 @@ mod tests {
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
-       /* let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        /* let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg("addr7777", 1000u128);
         execute(deps.as_mut(), env.clone(), info, receive_msg).unwrap();
         let res = query(
@@ -329,7 +329,6 @@ mod tests {
             },
         )
             .unwrap();*/
-
 
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
@@ -427,17 +426,13 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec![
-                "123456".to_string(),
-            ],
+            combination: vec!["123456".to_string()],
         };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         let withdraw_msg = loterra::msg::ExecuteMsg::Register {
             address: Some("addr0000".to_string()),
-            combination: vec![
-                "123456".to_string(),
-            ],
+            combination: vec!["123456".to_string()],
         };
         assert_eq!(
             res.messages,
@@ -450,7 +445,11 @@ mod tests {
                 }]
             })]
         );
-        let mut holder: Holder = read_holder(deps.as_ref().storage, &deps.api.addr_canonicalize(&"addr0000").unwrap()).unwrap();
+        let mut holder: Holder = read_holder(
+            deps.as_ref().storage,
+            &deps.api.addr_canonicalize(&"addr0000").unwrap(),
+        )
+        .unwrap();
         println!("{} hhhhh", holder.pending_rewards);
 
         // Too much ticket and not enough balance
@@ -527,23 +526,18 @@ mod tests {
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         let withdraw_msg = loterra::msg::ExecuteMsg::Register {
             address: Some("addr0000".to_string()),
-            combination: vec![
-                "123456".to_string(),
-            ],
+            combination: vec!["123456".to_string()],
         };
         assert_eq!(
             res.messages,
-            vec![
-                CosmosMsg::Wasm(WasmMsg::Execute {
+            vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: "loterra".to_string(),
                 msg: to_binary(&withdraw_msg).unwrap(),
                 send: vec![Coin {
                     denom: "uusd".to_string(),
                     amount: Uint128(1)
                 }]
-            })
-
-            ]
+            })]
         );
 
         // withdraw stake
@@ -643,9 +637,7 @@ mod tests {
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         let withdraw_msg = loterra::msg::ExecuteMsg::Register {
             address: Some("addr0000".to_string()),
-            combination: vec![
-                "123456".to_string(),
-            ],
+            combination: vec!["123456".to_string()],
         };
         assert_eq!(
             res.messages,
@@ -688,7 +680,7 @@ mod tests {
             cap: Some(Uint128::from(150u128)),
             address: "addr0000".to_string(),
         };
-        let info = mock_info( MOCK_HUB_CONTRACT_ADDR, &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 100000;
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
@@ -754,9 +746,7 @@ mod tests {
         let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
         let withdraw_msg = loterra::msg::ExecuteMsg::Register {
             address: Some("addr0000".to_string()),
-            combination: vec![
-                "123456".to_string(),
-            ],
+            combination: vec!["123456".to_string()],
         };
         assert_eq!(
             res.messages,

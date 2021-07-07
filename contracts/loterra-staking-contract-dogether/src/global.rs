@@ -1,11 +1,15 @@
 use crate::state::{CONFIG, STATE};
 
 use crate::math::decimal_summation_in_256;
-use cosmwasm_std::{attr, Decimal, DepsMut, Env, Response, StdError, StdResult, MessageInfo};
+use cosmwasm_std::{attr, Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 
 /// Increase global_index according to claimed rewards amount
 /// Only hub_contract is allowed to execute
-pub fn handle_update_global_index(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
+pub fn handle_update_global_index(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> StdResult<Response> {
     let mut state = STATE.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
 

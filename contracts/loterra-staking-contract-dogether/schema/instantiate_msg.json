@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "cw20_token_addr",
+    "loterra_addr",
     "reward_denom",
     "unbonding_period"
   ],
   "properties": {
     "cw20_token_addr": {
+      "$ref": "#/definitions/Addr"
+    },
+    "loterra_addr": {
       "$ref": "#/definitions/Addr"
     },
     "reward_denom": {

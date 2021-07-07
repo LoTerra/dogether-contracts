@@ -16,7 +16,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Staking operations Unbound user staking balance Withdraw rewards to pending rewards Set current reward index to global index",
+      "description": "Unbound user staking balance Withdraw rewards to pending rewards Set current reward index to global index",
       "type": "object",
       "required": [
         "unbond_stake"
@@ -25,9 +25,13 @@
         "unbond_stake": {
           "type": "object",
           "required": [
+            "address",
             "amount"
           ],
           "properties": {
+            "address": {
+              "type": "string"
+            },
             "amount": {
               "$ref": "#/definitions/Uint128"
             }
@@ -45,7 +49,13 @@
       "properties": {
         "withdraw_stake": {
           "type": "object",
+          "required": [
+            "address"
+          ],
           "properties": {
+            "address": {
+              "type": "string"
+            },
             "cap": {
               "anyOf": [
                 {
@@ -62,27 +72,6 @@
       "additionalProperties": false
     },
     {
-      "description": "User's operations return the accrued reward in usdt to the user.",
-      "type": "object",
-      "required": [
-        "claim_rewards"
-      ],
-      "properties": {
-        "claim_rewards": {
-          "type": "object",
-          "properties": {
-            "recipient": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
       "description": "This accepts a properly-encoded ReceiveMsg from a cw20 contract",
       "type": "object",
       "required": [
@@ -91,6 +80,34 @@
       "properties": {
         "receive": {
           "$ref": "#/definitions/Cw20ReceiveMsg"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Bot's operations Purchase tickets on LoTerra lottery contract with pool rewards",
+      "type": "object",
+      "required": [
+        "get_ticket"
+      ],
+      "properties": {
+        "get_ticket": {
+          "type": "object",
+          "required": [
+            "combination",
+            "recipient"
+          ],
+          "properties": {
+            "combination": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "recipient": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false

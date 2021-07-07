@@ -3,7 +3,10 @@ use crate::state::{
     STATE,
 };
 
-use cosmwasm_std::{attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery, Fraction};
+use cosmwasm_std::{
+    attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, Fraction,
+    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+};
 
 use crate::claim::{claim_tokens, create_claim};
 use crate::math::{
@@ -127,9 +130,12 @@ pub fn handle_get_ticket(
     STATE.save(deps.storage, &state)?;
 
     /*
-        New calculation pending rewards adding new decimals
-     */
-    holder.pending_rewards = Decimal::from_ratio(rewards.checked_sub(total_ticket_with_fees).unwrap(), Uint128(1));
+       New calculation pending rewards adding new decimals
+    */
+    holder.pending_rewards = Decimal::from_ratio(
+        rewards.checked_sub(total_ticket_with_fees).unwrap(),
+        Uint128(1),
+    );
     holder.index = state.global_index;
     store_holder(deps.storage, &holder_addr_raw, &holder)?;
 
@@ -189,7 +195,6 @@ pub fn handle_bond(
     holder_addr: String,
     amount: Uint128,
 ) -> StdResult<Response> {
-
     if !info.funds.is_empty() {
         return Err(StdError::generic_err("Do not send funds with stake"));
     }
