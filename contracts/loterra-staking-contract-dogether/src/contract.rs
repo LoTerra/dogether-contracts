@@ -47,7 +47,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             recipient,
             combination,
         } => handle_get_ticket(deps, env, info, recipient, combination),
-        ExecuteMsg::UpdateGlobalIndex {} => handle_update_global_index(deps, env),
+        ExecuteMsg::UpdateGlobalIndex {} => handle_update_global_index(deps, env, info),
         ExecuteMsg::UnbondStake { amount, address } => {
             handle_unbound(deps, env, info, amount, address)
         }

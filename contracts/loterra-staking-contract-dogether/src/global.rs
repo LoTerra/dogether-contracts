@@ -1,18 +1,17 @@
 use crate::state::{CONFIG, STATE};
 
 use crate::math::decimal_summation_in_256;
-use cosmwasm_std::{attr, Decimal, DepsMut, Env, Response, StdError, StdResult};
+use cosmwasm_std::{attr, Decimal, DepsMut, Env, Response, StdError, StdResult, MessageInfo};
 
 /// Increase global_index according to claimed rewards amount
 /// Only hub_contract is allowed to execute
-pub fn handle_update_global_index(deps: DepsMut, env: Env) -> StdResult<Response> {
+pub fn handle_update_global_index(deps: DepsMut, env: Env, info: MessageInfo) -> StdResult<Response> {
     let mut state = STATE.load(deps.storage)?;
-    // anybody can trigger update_global_index
-    /*
-    if config.lottery_contract != deps.api.canonical_address(&env.message.sender)? {
-        return Err(StdError::unauthorized());
+    let config = CONFIG.load(deps.storage)?;
+
+    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
+        return Err(StdError::generic_err("Not authorized"));
     }
-     */
 
     // Zero staking balance check
     if state.total_balance.is_zero() {
