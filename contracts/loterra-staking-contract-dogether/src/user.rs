@@ -189,6 +189,10 @@ pub fn handle_bond(
     holder_addr: String,
     amount: Uint128,
 ) -> StdResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
+        return Err(StdError::generic_err("Not authorized"));
+    }
     if !info.funds.is_empty() {
         return Err(StdError::generic_err("Do not send funds with stake"));
     }
@@ -234,6 +238,9 @@ pub fn handle_unbound(
     address: String,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
+    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
+        return Err(StdError::generic_err("Not authorized"));
+    }
 
     let address_raw = deps.api.addr_canonicalize(&address)?;
 
@@ -289,6 +296,10 @@ pub fn handle_withdraw_stake(
     address: String,
 ) -> StdResult<Response> {
     let config = CONFIG.load(deps.storage)?;
+    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
+        return Err(StdError::generic_err("Not authorized"));
+    }
+
     let address_raw = deps.api.addr_canonicalize(&address.as_str())?;
 
     let amount = claim_tokens(deps.storage, address_raw, &env.block, cap)?;
