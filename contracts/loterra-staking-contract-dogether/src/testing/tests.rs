@@ -315,8 +315,21 @@ mod tests {
 
         let init_msg = default_init();
         let env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
+
+       /* let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let receive_msg = receive_stake_msg("addr7777", 1000u128);
+        execute(deps.as_mut(), env.clone(), info, receive_msg).unwrap();
+        let res = query(
+            deps.as_ref(),
+            env.clone(),
+            QueryMsg::Holder {
+                address: "addr7777".to_string(),
+            },
+        )
+            .unwrap();*/
+
 
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
@@ -324,7 +337,7 @@ mod tests {
         };
 
         // Failed underflow
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Err(StdError::GenericErr { msg, .. }) => {
@@ -334,16 +347,16 @@ mod tests {
         };
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
-        let receive_msg = receive_stake_msg("addr0000", 100);
+        let receive_msg = receive_stake_msg("addr7777", 100);
         execute(deps.as_mut(), env.clone(), info, receive_msg).unwrap();
 
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
             address: "addr7777".to_string(),
@@ -354,7 +367,7 @@ mod tests {
             deps.as_ref(),
             env.clone(),
             QueryMsg::Holder {
-                address: "addr0000".to_string(),
+                address: "addr7777".to_string(),
             },
         )
         .unwrap();
@@ -363,7 +376,7 @@ mod tests {
         assert_eq!(
             holder_response,
             HolderResponse {
-                address: "addr0000".to_string(),
+                address: "addr7777".to_string(),
                 balance: Uint128::zero(),
                 index: Decimal::one(),
                 pending_rewards: Decimal::from_str("100").unwrap(),
@@ -380,7 +393,7 @@ mod tests {
 
         let init_msg = default_init();
         let env = mock_env();
-        let info = mock_info(MOCK_TOKEN_CONTRACT_ADDR, &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
@@ -465,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn withdraw_stake() {
+    fn withdraw_burn_stake() {
         let mut deps = mock_dependencies(&[Coin {
             denom: DEFAULT_REWARD_DENOM.to_string(),
             amount: Uint128(100u128),
@@ -473,7 +486,7 @@ mod tests {
 
         let init_msg = default_init();
         let mut env = mock_env();
-        let info = mock_info(MOCK_TOKEN_CONTRACT_ADDR, &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
@@ -507,37 +520,47 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
+            address: Some("addr0000".to_string()),
+            combination: vec![
+                "123456".to_string(),
+            ],
+        };
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr0000".to_string(),
-                amount: vec![Coin {
+            vec![
+                CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "loterra".to_string(),
+                msg: to_binary(&withdraw_msg).unwrap(),
+                send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128::from(99u128), // 1% tax
+                    amount: Uint128(1)
                 }]
-            })]
+            })
+
+            ]
         );
 
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 5;
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         // withdraw before unbonding fails
         let msg = ExecuteMsg::WithdrawStake {
             cap: None,
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 10;
         let res = execute(deps.as_mut(), env.clone(), info, msg);
 
@@ -551,28 +574,27 @@ mod tests {
         // withdraw works after unbonding period
         let msg = ExecuteMsg::WithdrawStake {
             cap: None,
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 10000;
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let cw20_transfer_msg = Cw20ExecuteMsg::Transfer {
-            recipient: "addr0000".to_string(),
+        let cw20_burn_msg = Cw20ExecuteMsg::Burn {
             amount: Uint128::from(100u128),
         };
         assert_eq!(
             res.messages,
             vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: MOCK_CW20_CONTRACT_ADDR.to_string(),
-                msg: to_binary(&cw20_transfer_msg).unwrap(),
+                msg: to_binary(&cw20_burn_msg).unwrap(),
                 send: vec![]
             })]
         );
     }
 
     #[test]
-    fn withdraw_stake_cap() {
+    fn withdraw_burn_stake_cap() {
         let mut deps = mock_dependencies(&[Coin {
             denom: DEFAULT_REWARD_DENOM.to_string(),
             amount: Uint128(100u128),
@@ -580,7 +602,7 @@ mod tests {
 
         let init_msg = default_init();
         let mut env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
@@ -609,23 +631,30 @@ mod tests {
 
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
+            address: Some("addr0000".to_string()),
+            combination: vec![
+                "123456".to_string(),
+            ],
+        };
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr0000".to_string(),
-                amount: vec![Coin {
+            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "loterra".to_string(),
+                msg: to_binary(&withdraw_msg).unwrap(),
+                send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128::from(99u128), // 1% tax
+                    amount: Uint128(1)
                 }]
             })]
         );
@@ -633,18 +662,18 @@ mod tests {
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 5;
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         // cap is less then release, wait for more to unbond
         let msg = ExecuteMsg::WithdrawStake {
             cap: Some(Uint128::from(50u128)),
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 100000;
         let res = execute(deps.as_mut(), env.clone(), info, msg);
         match res {
@@ -657,21 +686,20 @@ mod tests {
 
         let msg = ExecuteMsg::WithdrawStake {
             cap: Some(Uint128::from(150u128)),
-            address: "addr7777".to_string(),
+            address: "addr0000".to_string(),
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info( MOCK_HUB_CONTRACT_ADDR, &[]);
         env.block.height = 100000;
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let cw20_transfer_msg = Cw20ExecuteMsg::Transfer {
-            recipient: "addr0000".to_string(),
+        let cw20_burn_msg = Cw20ExecuteMsg::Burn {
             amount: Uint128::from(100u128),
         };
         assert_eq!(
             res.messages,
             vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: MOCK_CW20_CONTRACT_ADDR.to_string(),
-                msg: to_binary(&cw20_transfer_msg).unwrap(),
+                msg: to_binary(&cw20_burn_msg).unwrap(),
                 send: vec![]
             })]
         );
@@ -685,7 +713,7 @@ mod tests {
         }]);
         let init_msg = default_init();
         let mut env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
@@ -719,19 +747,26 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
+        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
+            address: Some("addr0000".to_string()),
+            combination: vec![
+                "123456".to_string(),
+            ],
+        };
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Bank(BankMsg::Send {
-                to_address: "addr0000".to_string(),
-                amount: vec![Coin {
+            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "loterra".to_string(),
+                msg: to_binary(&withdraw_msg).unwrap(),
+                send: vec![Coin {
                     denom: "uusd".to_string(),
-                    amount: Uint128::from(99007u128), // 1% tax
-                },]
+                    amount: Uint128(1)
+                }]
             })]
         );
 
@@ -917,7 +952,7 @@ mod tests {
 
         let init_msg = default_init();
         let mut env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         instantiate(deps.as_mut(), env.clone(), info, init_msg);
 
         let amount1 = Uint128::from(8899999999988889u128);
@@ -977,24 +1012,24 @@ mod tests {
         .unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0000").to_string(),
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0001", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec![],
+            recipient: Addr::unchecked("addr0002").to_string(),
+            combination: vec!["123456".to_string()],
         };
-        let info = mock_info("addr0002", &[]);
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let res = query(deps.as_ref(), env.clone(), QueryMsg::State {}).unwrap();

@@ -189,10 +189,7 @@ pub fn handle_bond(
     holder_addr: String,
     amount: Uint128,
 ) -> StdResult<Response> {
-    let config = CONFIG.load(deps.storage)?;
-    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
-        return Err(StdError::generic_err("Not authorized"));
-    }
+
     if !info.funds.is_empty() {
         return Err(StdError::generic_err("Do not send funds with stake"));
     }
