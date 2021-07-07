@@ -37,10 +37,9 @@ pub fn handle_get_ticket(
     let all_reward_with_decimals =
         decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
 
-    let decimals = get_decimals(all_reward_with_decimals).unwrap();
+    // let decimals = get_decimals(all_reward_with_decimals).unwrap();
 
     let rewards = all_reward_with_decimals * Uint128(1);
-    println!("{:?} dd", decimal_summation_in_256(Decimal::from_ratio(Uint128(2), Uint128(1)), holder.pending_rewards));
 
     if rewards.is_zero() {
         return Err(StdError::generic_err("No rewards have accrued yet"));
@@ -128,7 +127,7 @@ pub fn handle_get_ticket(
     STATE.save(deps.storage, &state)?;
 
     /*
-        Calculation pending rewards adding new decimals
+        New calculation pending rewards adding new decimals
      */
     holder.pending_rewards = Decimal::from_ratio(rewards.checked_sub(total_ticket_with_fees).unwrap(), Uint128(1));
     holder.index = state.global_index;

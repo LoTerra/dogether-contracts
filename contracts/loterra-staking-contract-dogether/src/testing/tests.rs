@@ -459,7 +459,7 @@ mod tests {
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg);
         match res {
-            Err(StdError::GenericErr {msg, ..}) => assert_eq!(msg, "Not enough funds, you want to buy 4UST + 1UST network fees tickets and you only have 4UST"),
+            Err(StdError::GenericErr {msg, ..}) => assert_eq!(msg, "Not enough funds, you want to buy 4UST + 1UST network fees tickets and you only have 2UST"),
             _ => panic!("Do not enter here")
         }
     }
