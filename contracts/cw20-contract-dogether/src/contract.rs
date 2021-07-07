@@ -324,7 +324,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
         let minter = String::from("creator");
-        let limit = Uint128(511223344);
+        let _limit = Uint128(511223344);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
