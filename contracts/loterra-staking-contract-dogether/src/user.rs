@@ -4,8 +4,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, BankMsg, Coin, Decimal, Deps, DepsMut, Env, Fraction,
-    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    attr, from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::claim::{claim_tokens, create_claim};
@@ -16,7 +16,6 @@ use crate::msg::{AccruedRewardsResponse, HolderResponse, HoldersResponse, Receiv
 use crate::taxation::deduct_tax;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, Expiration};
 use loterra;
-use std::str::FromStr;
 
 pub fn handle_get_ticket(
     deps: DepsMut,
@@ -384,6 +383,7 @@ fn calculate_decimal_rewards(
 }
 
 // calculate the reward with decimal
+/*
 fn get_decimals(value: Decimal) -> StdResult<Decimal> {
     let stringed: &str = &*value.to_string();
     let parts: &[&str] = &*stringed.split('.').collect::<Vec<&str>>();
@@ -395,7 +395,7 @@ fn get_decimals(value: Decimal) -> StdResult<Decimal> {
         }
         _ => Err(StdError::generic_err("Unexpected number of dots")),
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(reward.to_string(), "90");
     }
 
-    #[test]
+    /*#[test]
     pub fn proper_get_decimals() {
         let global_index = Decimal::from_ratio(Uint128(9999999), Uint128(100000000));
         let user_index = Decimal::zero();
@@ -420,5 +420,5 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reward.to_string(), "0.9999999");
-    }
+    }*/
 }

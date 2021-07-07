@@ -3,11 +3,15 @@
   "title": "ConfigResponse",
   "type": "object",
   "required": [
+    "admin",
     "cw20_token_addr",
     "reward_denom",
     "unbonding_period"
   ],
   "properties": {
+    "admin": {
+      "type": "string"
+    },
     "cw20_token_addr": {
       "type": "string"
     },
