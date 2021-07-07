@@ -213,9 +213,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{
-        coins, from_binary, Addr, Api, Attribute, CosmosMsg, Empty, StdError, WasmMsg,
-    };
+    use cosmwasm_std::{coins, from_binary, Addr, StdError, WasmMsg};
 
     use super::*;
 

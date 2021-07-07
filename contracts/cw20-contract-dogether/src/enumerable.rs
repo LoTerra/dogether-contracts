@@ -29,14 +29,12 @@ pub fn query_all_accounts(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::{DepsMut, Uint128};
+    use cw20::{Cw20Coin, TokenInfoResponse};
 
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, DepsMut, Uint128};
-    use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
-
-    use crate::contract::{execute, instantiate, query_token_info};
-    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use crate::contract::{instantiate, query_token_info};
+    use crate::msg::InstantiateMsg;
 
     // this will set up the instantiation for other tests
     fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
