@@ -507,7 +507,7 @@ mod tests {
             recipient: "provider".to_string(),
         };
         // Error not the authorized minter
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
         match res {
             Err(ContractError::Unauthorized {}) => {}
             _ => panic!("Do not enter here"),
@@ -521,7 +521,7 @@ mod tests {
             msg: Default::default(),
             recipient: "provider".to_string(),
         };
-        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
         println!("{:?}", res);
         let msg = Cw20ReceiveMsg {
             sender: "provider".to_string(),

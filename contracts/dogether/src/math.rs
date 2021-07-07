@@ -25,14 +25,6 @@ pub fn decimal_subtraction_in_256(a: Decimal, b: Decimal) -> Decimal {
     c_u256
 }
 
-/// return a - b
-pub fn decimal_div_in_256(a: Decimal, b: Decimal) -> Decimal {
-    let a_u256: Decimal256 = a.into();
-    let b_u256: Decimal256 = b.into();
-    let c_u256: Decimal = (a_u256 / b_u256).into();
-    c_u256
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

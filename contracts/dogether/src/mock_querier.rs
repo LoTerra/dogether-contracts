@@ -12,10 +12,10 @@ use terra_cosmwasm::{
     TerraQueryWrapper, TerraRoute,
 };
 
-pub const MOCK_HUB_CONTRACT_ADDR: &str = "hub";
-pub const MOCK_CW20_CONTRACT_ADDR: &str = "lottery";
+//pub const MOCK_HUB_CONTRACT_ADDR: &str = "hub";
+//pub const MOCK_CW20_CONTRACT_ADDR: &str = "lottery";
 //pub const MOCK_REWARD_CONTRACT_ADDR: &str = "reward";
-pub const MOCK_TOKEN_CONTRACT_ADDR: &str = "token";
+//pub const MOCK_TOKEN_CONTRACT_ADDR: &str = "token";
 
 pub fn mock_dependencies(
     contract_balance: &[Coin],

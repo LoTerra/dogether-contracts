@@ -26,30 +26,3 @@ pub fn query_all_accounts(
         accounts: accounts?,
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{DepsMut, Uint128};
-    use cw20::{Cw20Coin, TokenInfoResponse};
-
-    use crate::contract::{instantiate, query_token_info};
-    use crate::msg::InstantiateMsg;
-
-    // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
-        let instantiate_msg = InstantiateMsg {
-            name: "Auto Gen".to_string(),
-            symbol: "AUTO".to_string(),
-            decimals: 3,
-            initial_balances: vec![Cw20Coin {
-                address: addr.into(),
-                amount,
-            }],
-        };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
-        instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
-        query_token_info(deps.as_ref()).unwrap()
-    }
-}

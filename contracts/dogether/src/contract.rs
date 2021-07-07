@@ -6,8 +6,7 @@ use cosmwasm_std::{
 
 use crate::error::ContractError;
 use crate::math::{
-    decimal_div_in_256, decimal_multiplication_in_256, decimal_subtraction_in_256,
-    decimal_summation_in_256,
+    decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256,
 };
 use crate::msg::{Anchor, CountResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{read_config, read_state, store_config, store_state, Config, State};
@@ -583,10 +582,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+/*
 fn query_count(deps: Deps) -> StdResult<u64> {
     Ok(10)
 }
-
+*/
 #[cfg(test)]
 mod tests {
     use super::*;
