@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint128};
+use cosmwasm_std::{Binary, CanonicalAddr, StdResult, Storage, Uint128};
 use cw_storage_plus::Item;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,10 @@ pub struct Config {
     pub denom: String,
     pub money_market_address: CanonicalAddr,
     pub anchor_aust_address: CanonicalAddr,
+    pub code_id_staking: u64,
+    pub label_staking: String,
+    pub unbonding_period: u64,
+    pub loterra_address: CanonicalAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

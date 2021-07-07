@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Binary, CanonicalAddr, Coin, ContractResult, CosmosMsg,
-    Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, ReplyOn, Response, StdError,
-    StdResult, SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, Addr, BankMsg, Binary, CanonicalAddr, Coin, ContractResult,
+    CosmosMsg, Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, ReplyOn, Response,
+    StdError, StdResult, SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
@@ -37,6 +37,10 @@ pub fn instantiate(
         anchor_aust_address: deps
             .api
             .addr_canonicalize(msg.anchor_aust_address.as_str())?,
+        code_id_staking: msg.code_id_staking,
+        label_staking: msg.label_staking,
+        unbonding_period: msg.unbonding_period,
+        loterra_address: deps.api.addr_canonicalize(msg.loterra_address.as_str())?,
     };
     store_config(deps.storage, &config)?;
 
@@ -58,28 +62,13 @@ pub fn instantiate(
     };
     let cosmos_msg_cw20 = CosmosMsg::Wasm(instantiation_cw20);
     let sub_msg_cw20 = SubMsg {
-        id: msg.code_id_cw20,
+        id: 0,
         msg: cosmos_msg_cw20,
         gas_limit: None,
         reply_on: ReplyOn::Success,
     };
-    let instantiation_staking = WasmMsg::Instantiate {
-        admin: None,
-        code_id: msg.code_id_staking,
-        msg: msg.message_staking,
-        send: vec![],
-        label: msg.label_staking,
-    };
-    let cosmos_msg_staking = CosmosMsg::Wasm(instantiation_staking);
-    let sub_msg_staking = SubMsg {
-        id: msg.code_id_staking,
-        msg: cosmos_msg_staking,
-        gas_limit: None,
-        reply_on: ReplyOn::Success,
-    };
-
     Ok(Response {
-        submessages: vec![sub_msg_cw20, sub_msg_staking],
+        submessages: vec![sub_msg_cw20],
         messages: vec![],
         attributes: vec![
             attr("instantiate", "Dogether"),
@@ -376,6 +365,7 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 }*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let config = read_config(deps.storage)?;
     match msg.id {
         0 => cw20_instance_reply(deps, env, msg.result),
         1 => staking_instance_reply(deps, env, msg.result),
@@ -390,6 +380,7 @@ pub fn cw20_instance_reply(
     msg: ContractResult<SubcallResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
+    let config = read_config(deps.storage)?;
     match msg {
         ContractResult::Ok(subcall) => {
             let contract_address = subcall
@@ -405,8 +396,30 @@ pub fn cw20_instance_reply(
                 .unwrap();
             state.cw20_address = deps.api.addr_canonicalize(&contract_address.as_str())?;
             store_state(deps.storage, &state)?;
+
+            let data = loterra_staking_contract_dogether::msg::InstantiateMsg {
+                cw20_token_addr: Addr::unchecked(contract_address.clone()),
+                loterra_addr: deps.api.addr_humanize(&config.loterra_address)?,
+                reward_denom: config.denom,
+                unbonding_period: config.unbonding_period,
+            };
+            let instantiation_staking = WasmMsg::Instantiate {
+                admin: None,
+                code_id: config.code_id_staking,
+                msg: to_binary(&data)?,
+                send: vec![],
+                label: config.label_staking,
+            };
+            let cosmos_msg_staking = CosmosMsg::Wasm(instantiation_staking);
+            let sub_msg_staking = SubMsg {
+                id: 1,
+                msg: cosmos_msg_staking,
+                gas_limit: None,
+                reply_on: ReplyOn::Success,
+            };
+
             Ok(Response {
-                submessages: vec![],
+                submessages: vec![sub_msg_staking],
                 messages: vec![],
                 attributes: vec![
                     attr("cw20-address", contract_address),
@@ -588,12 +601,13 @@ mod tests {
             message_cw20: Default::default(),
             label_cw20: "".to_string(),
             code_id_staking: 1,
-            message_staking: Default::default(),
             label_staking: "".to_string(),
             money_market_address: "money".to_string(),
             anchor_aust_address: "aust".to_string(),
             next_draw: 1000,
             draw_period: 100,
+            unbonding_period: 100_000,
+            loterra_address: "loterra".to_string(),
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
         // we can just call .unwrap() to assert this was a success
@@ -607,12 +621,13 @@ mod tests {
             message_cw20: Default::default(),
             label_cw20: "".to_string(),
             code_id_staking: 1,
-            message_staking: Default::default(),
             label_staking: "".to_string(),
             money_market_address: "money".to_string(),
             anchor_aust_address: "aust".to_string(),
             next_draw: 100,
             draw_period: 1000,
+            unbonding_period: 100_000,
+            loterra_address: "loterra".to_string(),
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
 
@@ -917,12 +932,30 @@ mod tests {
             deps.api.addr_canonicalize("cw20").unwrap()
         );
         assert_ne!(state_before.cw20_address, state.cw20_address);
-        let d = deps.api.addr_humanize(&state_before.cw20_address).unwrap();
 
+        let msg = loterra_staking_contract_dogether::msg::InstantiateMsg {
+            cw20_token_addr: Addr::unchecked("cw20"),
+            loterra_addr: Addr::unchecked("loterra"),
+            reward_denom: "uusd".to_string(),
+            unbonding_period: 100000,
+        };
+        let instantiate_staking = CosmosMsg::Wasm(WasmMsg::Instantiate {
+            admin: None,
+            code_id: 1,
+            msg: to_binary(&msg).unwrap(),
+            send: vec![],
+            label: "".to_string(),
+        });
+        let sub_msg = SubMsg {
+            id: 1,
+            msg: instantiate_staking,
+            gas_limit: None,
+            reply_on: ReplyOn::Success,
+        };
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
+                submessages: vec![sub_msg],
                 messages: vec![],
                 attributes: vec![
                     attr("cw20-address", "cw20"),

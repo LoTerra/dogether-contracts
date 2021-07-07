@@ -5,8 +5,12 @@
   "required": [
     "admin",
     "anchor_aust_address",
+    "code_id_staking",
     "denom",
-    "money_market_address"
+    "label_staking",
+    "loterra_address",
+    "money_market_address",
+    "unbonding_period"
   ],
   "properties": {
     "admin": {
@@ -15,11 +19,27 @@
     "anchor_aust_address": {
       "$ref": "#/definitions/CanonicalAddr"
     },
+    "code_id_staking": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
     "denom": {
       "type": "string"
     },
+    "label_staking": {
+      "type": "string"
+    },
+    "loterra_address": {
+      "$ref": "#/definitions/CanonicalAddr"
+    },
     "money_market_address": {
       "$ref": "#/definitions/CanonicalAddr"
+    },
+    "unbonding_period": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     }
   },
   "definitions": {

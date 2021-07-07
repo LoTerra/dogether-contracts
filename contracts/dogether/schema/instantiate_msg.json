@@ -9,10 +9,11 @@
     "draw_period",
     "label_cw20",
     "label_staking",
+    "loterra_address",
     "message_cw20",
-    "message_staking",
     "money_market_address",
-    "next_draw"
+    "next_draw",
+    "unbonding_period"
   ],
   "properties": {
     "anchor_aust_address": {
@@ -39,16 +40,21 @@
     "label_staking": {
       "type": "string"
     },
-    "message_cw20": {
-      "$ref": "#/definitions/Binary"
+    "loterra_address": {
+      "type": "string"
     },
-    "message_staking": {
+    "message_cw20": {
       "$ref": "#/definitions/Binary"
     },
     "money_market_address": {
       "type": "string"
     },
     "next_draw": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "unbonding_period": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

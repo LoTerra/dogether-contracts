@@ -78,6 +78,7 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
+    pub admin: String,
     pub cw20_token_addr: String,
     pub reward_denom: String,
     pub unbonding_period: u64,

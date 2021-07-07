@@ -76,6 +76,7 @@ pub fn query_config(deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<ConfigRe
     let config = CONFIG.load(deps.storage)?;
 
     Ok(ConfigResponse {
+        admin: deps.api.addr_humanize(&config.admin)?.to_string(),
         cw20_token_addr: deps.api.addr_humanize(&config.cw20_token_addr)?.to_string(),
         reward_denom: config.reward_denom,
         unbonding_period: config.unbonding_period,
