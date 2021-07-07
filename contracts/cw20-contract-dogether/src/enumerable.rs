@@ -48,7 +48,6 @@ mod tests {
                 address: addr.into(),
                 amount,
             }],
-            mint: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();

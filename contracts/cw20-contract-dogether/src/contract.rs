@@ -1,8 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Uint128,
+    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -20,7 +19,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -29,27 +28,16 @@ pub fn instantiate(
     // create initial accounts
     let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
 
-    if let Some(limit) = msg.get_cap() {
-        if total_supply > limit {
-            return Err(StdError::generic_err("Initial supply greater than cap"));
-        }
-    }
-
-    let mint = match msg.mint {
-        Some(m) => Some(MinterData {
-            minter: deps.api.addr_validate(&m.minter)?,
-            cap: m.cap,
-        }),
-        None => None,
-    };
-
     // store token info
     let data = TokenInfo {
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply,
-        mint,
+        mint: Some(MinterData {
+            minter: info.sender,
+            cap: None,
+        }),
     };
     TOKEN_INFO.save(deps.storage, &data)?;
     Ok(Response::default())
@@ -256,7 +244,15 @@ mod tests {
 
     // this will set up the instantiation for other tests
     fn do_instantiate(deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
-        _do_instantiate(deps, addr, amount, None)
+        _do_instantiate(
+            deps,
+            addr,
+            amount,
+            Some(MinterResponse {
+                minter: "creator".to_string(),
+                cap: None,
+            }),
+        )
     }
 
     // this will set up the instantiation for other tests
@@ -274,7 +270,6 @@ mod tests {
                 address: addr.to_string(),
                 amount,
             }],
-            mint: mint.clone(),
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -292,7 +287,7 @@ mod tests {
             }
         );
         assert_eq!(get_balance(deps.as_ref(), addr), amount);
-        assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
+        assert_eq!(query_minter(deps.as_ref()).unwrap(), mint);
         meta
     }
 
@@ -308,7 +303,6 @@ mod tests {
                 address: String::from("addr0000"),
                 amount,
             }],
-            mint: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -331,7 +325,7 @@ mod tests {
     fn instantiate_mintable() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
-        let minter = String::from("asmodat");
+        let minter = String::from("creator");
         let limit = Uint128(511223344);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
@@ -341,10 +335,6 @@ mod tests {
                 address: "addr0000".into(),
                 amount,
             }],
-            mint: Some(MinterResponse {
-                minter: minter.clone(),
-                cap: Some(limit),
-            }),
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -363,41 +353,9 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
         assert_eq!(
             query_minter(deps.as_ref()).unwrap(),
-            Some(MinterResponse {
-                minter,
-                cap: Some(limit),
-            }),
+            Some(MinterResponse { minter, cap: None }),
         );
     }
-
-    #[test]
-    fn instantiate_mintable_over_cap() {
-        let mut deps = mock_dependencies(&[]);
-        let amount = Uint128(11223344);
-        let minter = String::from("asmodat");
-        let limit = Uint128(11223300);
-        let instantiate_msg = InstantiateMsg {
-            name: "Cash Token".to_string(),
-            symbol: "CASH".to_string(),
-            decimals: 9,
-            initial_balances: vec![Cw20Coin {
-                address: String::from("addr0000"),
-                amount,
-            }],
-            mint: Some(MinterResponse {
-                minter,
-                cap: Some(limit),
-            }),
-        };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
-        let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
-        assert_eq!(
-            err,
-            StdError::generic_err("Initial supply greater than cap")
-        );
-    }
-
     #[test]
     fn instantiate_multiple_accounts() {
         let mut deps = mock_dependencies(&[]);
@@ -419,7 +377,6 @@ mod tests {
                     amount: amount2,
                 },
             ],
-            mint: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -528,7 +485,7 @@ mod tests {
     #[test]
     fn bond() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        do_instantiate_with_minter(deps.as_mut(), "minter00", Uint128::zero(), "minter00", None);
+        do_instantiate_with_minter(deps.as_mut(), "creator", Uint128::zero(), "creator", None);
 
         let info = mock_info("addr0001", &[]);
         let env = mock_env();
@@ -559,7 +516,7 @@ mod tests {
         }
 
         // Success
-        let info = mock_info("minter00", &[]);
+        let info = mock_info("creator", &[]);
         let msg = ExecuteMsg::Bond {
             contract: "staking".to_string(),
             amount: Uint128(1_000_000),

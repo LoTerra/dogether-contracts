@@ -20,16 +20,6 @@
         "$ref": "#/definitions/Cw20Coin"
       }
     },
-    "mint": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/MinterResponse"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "name": {
       "type": "string"
     },
@@ -50,28 +40,6 @@
         },
         "amount": {
           "$ref": "#/definitions/Uint128"
-        }
-      }
-    },
-    "MinterResponse": {
-      "type": "object",
-      "required": [
-        "minter"
-      ],
-      "properties": {
-        "cap": {
-          "description": "cap is how many more tokens can be issued by the minter",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Uint128"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "minter": {
-          "type": "string"
         }
       }
     },

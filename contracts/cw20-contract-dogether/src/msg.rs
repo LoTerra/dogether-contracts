@@ -1,5 +1,5 @@
 use cosmwasm_std::{Binary, StdError, StdResult, Uint128};
-use cw20::{Cw20Coin, MinterResponse};
+use cw20::Cw20Coin;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,13 +9,12 @@ pub struct InstantiateMsg {
     pub symbol: String,
     pub decimals: u8,
     pub initial_balances: Vec<Cw20Coin>,
-    pub mint: Option<MinterResponse>,
 }
 
 impl InstantiateMsg {
-    pub fn get_cap(&self) -> Option<Uint128> {
+    /*pub fn get_cap(&self) -> Option<Uint128> {
         self.mint.as_ref().and_then(|v| v.cap)
-    }
+    }*/
 
     pub fn validate(&self) -> StdResult<()> {
         // Check name, symbol, decimals
