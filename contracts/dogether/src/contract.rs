@@ -9,7 +9,7 @@ use crate::math::{
     decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256,
 };
 use crate::msg::{Anchor, CountResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{read_config, read_state, store_config, store_state, Config, State};
+use crate::state::{read_config, read_state, store_config, store_state, Config, State, PREFIXED_COMBINATIONS};
 use crate::taxation::deduct_tax;
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use cw20;
@@ -17,7 +17,7 @@ use cw20_base_dogether;
 use loterra_staking_contract_dogether;
 use std::ops::{Mul, Sub};
 use std::str::FromStr;
-
+use loterra;
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -90,7 +90,7 @@ pub fn execute(
         ExecuteMsg::Pool {} => try_pool(deps, env, info),
         ExecuteMsg::UnPool { amount } => try_un_pool(deps, env, info, amount),
         ExecuteMsg::ClaimUnPool {} => try_claim_un_pool(deps, env, info),
-        ExecuteMsg::RedeemEarning {} => try_redeem_earning(deps, env, info),
+        ExecuteMsg::RedeemEarning { combination } => try_redeem_earning(deps, env, info, combination),
     }
 }
 pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
@@ -245,6 +245,7 @@ pub fn try_redeem_earning(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    combination: Vec<String>
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
 
@@ -313,10 +314,93 @@ pub fn try_redeem_earning(
         .querier
         .query_balance(env.contract.address, config.denom.clone())?;
 
+
+    /*
+        TODO: OK this is allDogether the earning are not sent to the staking contract but to the lottery contract. The result is prizes are shared between winners
+     */
+    let query = loterra::msg::QueryMsg::Config {};
+    let msg_query = WasmQuery::Smart {
+        contract_addr: deps.api.addr_humanize(&config.loterra_address)?.to_string(),
+        msg: to_binary(&query)?,
+    };
+    let query_loterra: loterra::msg::ConfigResponse = deps.querier.query(&msg_query.into())?;
+    let price_per_ticket = query_loterra.price_per_ticket_to_register;
+    // Total ticket cost
+    let total_ticket_cost = Uint128(price_per_ticket.u128() * combination.len() as u128);
+    // Total ticket cost minus fees
+    let total_ticket_cost_net = deduct_tax(
+        &deps.querier,
+        Coin {
+            denom: config.denom.clone(),
+            amount: total_ticket_cost,
+        },
+    )?
+        .amount;
+    // Total network fees
+    let total_fee = total_ticket_cost
+        .checked_sub(total_ticket_cost_net)
+        .unwrap();
+    // Total ticket cost + fees summation
+    let total_ticket_with_fees = total_ticket_cost.checked_add(total_fee).unwrap();
+
+    // Check if enough rewards to buy tickets
+    if contract_balance < total_ticket_with_fees {
+        return Err(ContractError::NotEnoughFunds {});
+    }
+
+    /*
+       Check if it is the more efficient way to check combination exist
+    */
+    for combo in combination.clone() {
+        match PREFIXED_COMBINATIONS.may_load(
+            deps.storage,
+            (
+                &query_loterra.lottery_counter.to_be_bytes(),
+                &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                &combo.as_bytes(),
+            ),
+        )? {
+            None => {
+                PREFIXED_COMBINATIONS.save(
+                    deps.storage,
+                    (
+                        &query_loterra.lottery_counter.to_be_bytes(),
+                        &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                        &combo.as_bytes(),
+                    ),
+                    &combo,
+                )?;
+            }
+            Some(_) => {
+                return Err(ContractError::Unauthorized {});
+               /* return Err(StdError::generic_err(format!(
+                    "Combination {} already exist",
+                    combo
+                )));*/
+            }
+        }
+    }
+
+    let msg_loterra = loterra::msg::ExecuteMsg::Register {
+        address: Some(deps.api.addr_humanize(&state.staking_address)?.to_string()),
+        combination: combination.clone(),
+    };
+    let execute = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
+        msg: to_binary(&msg_loterra)?,
+        send: vec![deduct_tax(
+            &deps.querier,
+            Coin {
+                denom: config.reward_denom,
+                amount: total_ticket_with_fees,
+            },
+        )?],
+    };
+
     /*
        Send earning to staking contract
     */
-    let update_global_index =
+    /*let update_global_index =
         loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
     let msg_update_global_index = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
@@ -328,14 +412,14 @@ pub fn try_redeem_earning(
                 amount: contract_balance.amount,
             },
         )?],
-    };
+    };*/
 
     state.next_draw = env.block.height.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![msg_redeem.into(), msg_update_global_index.into()],
+        messages: vec![msg_redeem.into(), execute.into()],
         attributes: vec![],
         data: None,
     })

@@ -28,7 +28,7 @@ pub enum ExecuteMsg {
     /// Withdraw unPool tokens after un-bonding period succeed
     ClaimUnPool {},
     /// Redeem earning from anchor
-    RedeemEarning {},
+    RedeemEarning { combination: Vec<String> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

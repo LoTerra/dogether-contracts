@@ -92,5 +92,3 @@ fn calc_range_start(api: &dyn Api, start_after: Option<Addr>) -> StdResult<Optio
         None => Ok(None),
     }
 }
-
-pub const PREFIXED_COMBINATIONS: Map<(&[u8], &[u8], &[u8]), String> = Map::new("combinations");

@@ -17,6 +17,7 @@ use crate::taxation::deduct_tax;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, Expiration};
 use loterra;
 
+/*
 pub fn handle_get_ticket(
     deps: DepsMut,
     _env: Env,
@@ -164,7 +165,7 @@ pub fn handle_get_ticket(
             attr("ticket_number", combination.len()),
         ],
     })
-}
+} */
 
 pub fn handle_receive(
     deps: DepsMut,

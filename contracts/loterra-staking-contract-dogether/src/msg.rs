@@ -36,7 +36,7 @@ pub enum ExecuteMsg {
 
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
-
+/*
     //////////////////
     /// Bot's operations
     /////////////////
@@ -44,7 +44,7 @@ pub enum ExecuteMsg {
     GetTicket {
         recipient: String,
         combination: Vec<String>,
-    },
+    }, */
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

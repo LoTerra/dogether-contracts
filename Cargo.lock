@@ -316,6 +316,7 @@ dependencies = [
  "cw-storage-plus",
  "cw20",
  "cw20-base-dogether",
+ "loterra",
  "loterra-staking-contract-dogether",
  "schemars",
  "serde",
