@@ -279,12 +279,10 @@ pub fn try_redeem_earning(
     //println!("{}", interest_a_ust_decimal);
     let interest_a_ust_decimal =
         Decimal256::from_ratio(Decimal256::from(interest_ust).0, res.exchange_rate.0);
-    println!("{}", interest_a_ust_decimal);
     //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
     // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
     //decimal_summation_in_256(interest_ust, Decimal::from_ratio(interest_ust, res.exchange_rate));
     let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
-    println!("{}", interest_to_withdraw);
 
     //println!("{:?}", get_decimals(interest_a_ust));
     //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
