@@ -362,7 +362,6 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 }*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
-    let config = read_config(deps.storage)?;
     match msg.id {
         0 => cw20_instance_reply(deps, env, msg.result),
         1 => staking_instance_reply(deps, env, msg.result),
