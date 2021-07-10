@@ -15,6 +15,23 @@ use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/*
+Instantiate default
+    {
+        "code_id_cw20":4005,
+        "message_cw20": "eyJuYW1lIjoiZG9nZXRoZXIiLCJzeW1ib2wiOiAiRE9HIiwiZGVjaW1hbHMiOiA2LCJpbml0aWFsX2JhbGFuY2VzIjpbXX0=",
+        "label_cw20": "Dog cw20",
+        "code_id_staking": 4010,
+        "label_staking": "Dog staking",
+        "money_market_address": "terra15dwd5mj8v59wpj0wvt233mf5efdff808c5tkal",
+        "anchor_aust_address": "terra1ajt556dpzvjwl0kl5tzku3fc3p3knkg9mkv8jl",
+        "next_draw": 100,
+        "draw_period": 1000,
+        "reward_denom":"uusd",
+        "unbonding_period":100000,
+        "loterra_address":"terra15dwd5mj8v59wpj0wvt233mf5efdff808c5tkal"
+    }
+*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     mut deps: DepsMut,
