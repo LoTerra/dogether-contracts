@@ -146,13 +146,10 @@ pub fn handle_get_ticket(
     let execute = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
         msg: to_binary(&msg_loterra)?,
-        funds: vec![deduct_tax(
-            &deps.querier,
-            Coin {
-                denom: config.reward_denom,
-                amount: total_ticket_with_fees,
-            },
-        )?],
+        funds: vec![Coin {
+            denom: config.reward_denom,
+            amount: total_ticket_cost,
+        }],
     };
 
     let res = Response::new()
