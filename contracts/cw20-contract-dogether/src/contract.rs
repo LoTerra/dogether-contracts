@@ -123,27 +123,20 @@ pub fn execute_bond(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let attrs = vec![
-        attr("action", "bond"),
-        attr("from", &info.sender),
-        attr("to", &contract),
-        attr("amount", amount),
-    ];
-
     // create a send message
     let msg_two = Cw20ReceiveMsg {
         sender: recipient,
         amount,
         msg,
     }
-    .into_cosmos_msg(contract)?;
+    .into_cosmos_msg(&contract)?;
 
-    let res = Response {
-        submessages: vec![],
-        messages: vec![msg_two],
-        attributes: attrs,
-        data: None,
-    };
+    let res = Response::new()
+        .add_message(msg_two)
+        .add_attribute("action", "bond")
+        .add_attribute("from", &info.sender)
+        .add_attribute("to", &contract)
+        .add_attribute("amount", amount);
 
     Ok(res)
 }
@@ -171,16 +164,10 @@ pub fn execute_burn(
         Ok(info)
     })?;
 
-    let res = Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![
-            attr("action", "burn"),
-            attr("from", info.sender),
-            attr("amount", amount),
-        ],
-        data: None,
-    };
+    let res = Response::new()
+        .add_attribute("action", "burn")
+        .add_attribute("from", info.sender)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -230,7 +217,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Addr, StdError};
+    use cosmwasm_std::{coins, from_binary, Addr, StdError, SubMsg};
 
     use super::*;
 
@@ -333,15 +320,18 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
+        assert_eq!(
+            get_balance(deps.as_ref(), "addr0000"),
+            Uint128::from(11223344u128)
+        );
     }
 
     #[test]
     fn instantiate_mintable() {
         let mut deps = mock_dependencies(&[]);
-        let amount = Uint128(11223344);
+        let amount = Uint128::from(11223344u128);
         let minter = String::from("creator");
-        let _limit = Uint128(511223344);
+        let _limit = Uint128::from(511223344u128);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
@@ -365,7 +355,10 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
+        assert_eq!(
+            get_balance(deps.as_ref(), "addr0000"),
+            Uint128::from(11223344_u128)
+        );
         assert_eq!(
             query_minter(deps.as_ref()).unwrap(),
             Some(MinterResponse { minter, cap: None }),
@@ -519,7 +512,7 @@ mod tests {
 
         let msg = ExecuteMsg::Bond {
             contract: "staking".to_string(),
-            amount: Uint128(1_000_000),
+            amount: Uint128::from(1_000_000_u128),
             msg: Default::default(),
             recipient: "provider".to_string(),
         };
@@ -534,7 +527,7 @@ mod tests {
         let info = mock_info("creator", &[]);
         let msg = ExecuteMsg::Bond {
             contract: "staking".to_string(),
-            amount: Uint128(1_000_000),
+            amount: Uint128::from(1_000_000_u128),
             msg: Default::default(),
             recipient: "provider".to_string(),
         };
@@ -542,17 +535,18 @@ mod tests {
         println!("{:?}", res);
         let msg = Cw20ReceiveMsg {
             sender: "provider".to_string(),
-            amount: Uint128(1_000_000),
+            amount: Uint128::from(1_000_000_u128),
             msg: Default::default(),
         }
         .into_cosmos_msg("staking")
         .unwrap();
-        assert_eq!(res.messages, vec![msg]);
+
+        assert_eq!(res.messages, vec![SubMsg::new(msg)]);
         let state = TOKEN_INFO.load(deps.as_ref().storage).unwrap();
-        assert_eq!(state.total_supply, Uint128(1_000_000));
+        assert_eq!(state.total_supply, Uint128::from(1_000_000_u128));
         let holder = BALANCES
             .load(deps.as_ref().storage, &Addr::unchecked("staking"))
             .unwrap();
-        assert_eq!(holder, Uint128(1_000_000));
+        assert_eq!(holder, Uint128::from(1_000_000_u128));
     }
 }

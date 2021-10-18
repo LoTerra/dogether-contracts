@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, BankMsg, Binary, CanonicalAddr, Coin, ContractResult,
     CosmosMsg, Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, ReplyOn, Response,
-    StdError, StdResult, SubMsg, SubcallResponse, Uint128, Uint64, WasmMsg, WasmQuery,
+    StdError, StdResult, SubMsg, SubMsgExecutionResponse, Uint128, Uint64, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
@@ -56,26 +56,20 @@ pub fn instantiate(
         admin: None,
         code_id: msg.code_id_cw20,
         msg: msg.message_cw20,
-        send: vec![],
         label: msg.label_cw20,
+        funds: vec![],
     };
     let cosmos_msg_cw20 = CosmosMsg::Wasm(instantiation_cw20);
-    let sub_msg_cw20 = SubMsg {
-        id: 0,
-        msg: cosmos_msg_cw20,
-        gas_limit: None,
-        reply_on: ReplyOn::Success,
-    };
-    Ok(Response {
-        submessages: vec![sub_msg_cw20],
-        messages: vec![],
-        attributes: vec![
-            attr("instantiate", "Dogether"),
-            attr("instantiate_cw20", "Dogether cw20"),
-            attr("instantiate_staking", "Dogether staking"),
-        ],
-        data: None,
-    })
+
+    let sub_msg_cw20 = SubMsg::reply_on_success(cosmos_msg_cw20, 0);
+
+    let res = Response::new()
+        .add_submessage(sub_msg_cw20)
+        .add_attribute("instantiate", "Dogether")
+        .add_attribute("instantiate_cw20", "Dogether cw20")
+        .add_attribute("instantiate_staking", "Dogether staking");
+
+    Ok(res)
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -117,7 +111,7 @@ pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response,
             .addr_humanize(&config.money_market_address)?
             .to_string(),
         msg: to_binary(&deposit)?,
-        send: vec![deduct_tax(
+        funds: vec![deduct_tax(
             &deps.querier,
             Coin {
                 denom: config.denom.clone(),
@@ -151,19 +145,17 @@ pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response,
     let bond_msg = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.cw20_address)?.to_string(),
         msg: to_binary(&bond)?,
-        send: vec![],
+        funds: vec![],
     };
 
     // Add UST amount pooled
     state.total_ust_pool = state.total_ust_pool.checked_add(sent).unwrap();
     store_state(deps.storage, &state)?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![deposit_msg.into(), bond_msg.into()],
-        attributes: vec![],
-        data: None,
-    })
+    let res = Response::new()
+        .add_message(deposit_msg)
+        .add_message(bond_msg);
+    Ok(res)
 }
 pub fn try_un_pool(
     deps: DepsMut,
@@ -186,18 +178,13 @@ pub fn try_un_pool(
         amount,
         address: info.sender.to_string(),
     };
-    let msg_un_bond = WasmMsg::Execute {
+    let msg_un_bond = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&un_bond)?,
-        send: vec![],
-    };
-
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![msg_un_bond.into()],
-        attributes: vec![],
-        data: None,
-    })
+        funds: vec![],
+    });
+    let res = Response::new().add_message(msg_un_bond);
+    Ok(res)
 }
 
 pub fn try_claim_un_pool(
@@ -220,26 +207,16 @@ pub fn try_claim_un_pool(
     let withdraw_msg = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&withdraw)?,
-        send: vec![],
+        funds: vec![],
     };
     let cosmos_msg = CosmosMsg::Wasm(withdraw_msg);
 
-    let sub_msg = SubMsg {
-        id: 2,
-        msg: cosmos_msg,
-        gas_limit: None,
-        reply_on: ReplyOn::Success,
-    };
-
+    let sub_msg = SubMsg::reply_on_success(cosmos_msg, 2);
     // Remove UST amount pooled
     //state.total_ust_pool = state.total_ust_pool.checked_sub(amount).unwrap();
     // store_state(deps.storage, &state)?;
-    Ok(Response {
-        submessages: vec![sub_msg],
-        messages: vec![],
-        attributes: vec![],
-        data: None,
-    })
+    let res = Response::new().add_submessage(sub_msg);
+    Ok(res)
 }
 pub fn try_redeem_earning(
     deps: DepsMut,
@@ -271,7 +248,7 @@ pub fn try_redeem_earning(
         msg: to_binary(&epoch)?,
     };
     let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
-    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128(1));
+    let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128::from(1_u128));
     let total_with_interest_ust =
         decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
     let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
@@ -282,7 +259,7 @@ pub fn try_redeem_earning(
     //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
     // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
     //decimal_summation_in_256(interest_ust, Decimal::from_ratio(interest_ust, res.exchange_rate));
-    let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
+    let interest_to_withdraw = Decimal::from(interest_a_ust_decimal) * Uint128::from(1_u128);
 
     //println!("{:?}", get_decimals(interest_a_ust));
     //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
@@ -297,7 +274,7 @@ pub fn try_redeem_earning(
             .addr_humanize(&config.money_market_address)?
             .to_string(),
         amount: interest_to_withdraw,
-        msg: Some(to_binary(&Anchor::RedeemStable {})?),
+        msg: to_binary(&Anchor::RedeemStable {})?,
     };
     let msg_redeem = WasmMsg::Execute {
         contract_addr: deps
@@ -305,7 +282,7 @@ pub fn try_redeem_earning(
             .addr_humanize(&config.anchor_aust_address)?
             .to_string(),
         msg: to_binary(&redeem)?,
-        send: vec![],
+        funds: vec![],
     };
 
     // Get the total contract balance and send all ust to staking contract
@@ -321,7 +298,7 @@ pub fn try_redeem_earning(
     let msg_update_global_index = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&update_global_index)?,
-        send: vec![deduct_tax(
+        funds: vec![deduct_tax(
             &deps.querier,
             Coin {
                 denom: config.denom,
@@ -332,13 +309,10 @@ pub fn try_redeem_earning(
 
     state.next_draw = env.block.height.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
-
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![msg_redeem.into(), msg_update_global_index.into()],
-        attributes: vec![],
-        data: None,
-    })
+    let res = Response::new()
+        .add_message(msg_redeem)
+        .add_message(msg_update_global_index);
+    Ok(res)
 }
 
 /*pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
@@ -373,7 +347,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
 pub fn cw20_instance_reply(
     deps: DepsMut,
     _env: Env,
-    msg: ContractResult<SubcallResponse>,
+    msg: ContractResult<SubMsgExecutionResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
@@ -382,7 +356,7 @@ pub fn cw20_instance_reply(
             let contract_address = subcall
                 .events
                 .into_iter()
-                .find(|e| e.kind == "instantiate_contract")
+                .find(|e| e.ty == "instantiate_contract")
                 .and_then(|ev| {
                     ev.attributes
                         .into_iter()
@@ -403,26 +377,16 @@ pub fn cw20_instance_reply(
                 admin: None,
                 code_id: config.code_id_staking,
                 msg: to_binary(&data)?,
-                send: vec![],
+                funds: vec![],
                 label: config.label_staking,
             };
             let cosmos_msg_staking = CosmosMsg::Wasm(instantiation_staking);
-            let sub_msg_staking = SubMsg {
-                id: 1,
-                msg: cosmos_msg_staking,
-                gas_limit: None,
-                reply_on: ReplyOn::Success,
-            };
-
-            Ok(Response {
-                submessages: vec![sub_msg_staking],
-                messages: vec![],
-                attributes: vec![
-                    attr("cw20-address", contract_address),
-                    attr("cw20-instantiate", "success"),
-                ],
-                data: None,
-            })
+            let sub_msg_staking = SubMsg::reply_on_success(cosmos_msg_staking, 1);
+            let res = Response::new()
+                .add_submessage(sub_msg_staking)
+                .add_attribute("cw20-address", contract_address)
+                .add_attribute("cw20-instantiate", "success");
+            Ok(res)
         }
         ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
     }
@@ -430,7 +394,7 @@ pub fn cw20_instance_reply(
 pub fn staking_instance_reply(
     deps: DepsMut,
     _env: Env,
-    msg: ContractResult<SubcallResponse>,
+    msg: ContractResult<SubMsgExecutionResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     match msg {
@@ -438,7 +402,7 @@ pub fn staking_instance_reply(
             let contract_address = subcall
                 .events
                 .into_iter()
-                .find(|e| e.kind == "instantiate_contract")
+                .find(|e| e.ty == "instantiate_contract")
                 .and_then(|ev| {
                     ev.attributes
                         .into_iter()
@@ -448,15 +412,11 @@ pub fn staking_instance_reply(
                 .unwrap();
             state.staking_address = deps.api.addr_canonicalize(&contract_address.as_str())?;
             store_state(deps.storage, &state)?;
-            Ok(Response {
-                submessages: vec![],
-                messages: vec![],
-                attributes: vec![
-                    attr("staking-address", contract_address),
-                    attr("staking-instantiate", "success"),
-                ],
-                data: None,
-            })
+            let res = Response::new()
+                .add_attribute("staking-address", contract_address)
+                .add_attribute("staking-instantiate", "success");
+
+            Ok(res)
         }
         ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
     }
@@ -465,7 +425,7 @@ pub fn staking_instance_reply(
 pub fn withdraw_reply(
     deps: DepsMut,
     env: Env,
-    msg: ContractResult<SubcallResponse>,
+    msg: ContractResult<SubMsgExecutionResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;
@@ -474,7 +434,7 @@ pub fn withdraw_reply(
             let (withdrawing_amount, recipient) = subcall
                 .events
                 .into_iter()
-                .find(|e| e.kind == "message")
+                .find(|e| e.ty == "message")
                 .and_then(|ev| {
                     let amount = ev
                         .attributes
@@ -508,11 +468,11 @@ pub fn withdraw_reply(
                 msg: to_binary(&epoch)?,
             };
             let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
-            let total_ust_pool = Decimal::from_ratio(amount_to_withdraw, Uint128(1));
+            let total_ust_pool = Decimal::from_ratio(amount_to_withdraw, Uint128::from(1_u128));
             let interest_a_ust_decimal =
                 Decimal256::from_ratio(Decimal256::from(total_ust_pool).0, res.exchange_rate.0);
-            let interest_to_withdraw = Decimal::from(interest_a_ust_decimal.into()) * Uint128(1);
-
+            let interest_to_withdraw =
+                Decimal::from(interest_a_ust_decimal) * Uint128::from(1_u128);
             /*
                 Redeem stable coin from anchor
             */
@@ -522,7 +482,7 @@ pub fn withdraw_reply(
                     .addr_humanize(&config.money_market_address)?
                     .to_string(),
                 amount: interest_to_withdraw,
-                msg: Some(to_binary(&Anchor::RedeemStable {})?),
+                msg: to_binary(&Anchor::RedeemStable {})?,
             };
             let msg_redeem = WasmMsg::Execute {
                 contract_addr: deps
@@ -530,7 +490,7 @@ pub fn withdraw_reply(
                     .addr_humanize(&config.anchor_aust_address)?
                     .to_string(),
                 msg: to_binary(&redeem)?,
-                send: vec![],
+                funds: vec![],
             };
             // Get the total contract balance and send ust
             let contract_balance = deps
@@ -558,15 +518,12 @@ pub fn withdraw_reply(
                 to_address: recipient.unwrap(),
                 amount: vec![net_amount.clone()],
             });
-            Ok(Response {
-                submessages: vec![],
-                messages: vec![msg_redeem.into(), bank_msg],
-                attributes: vec![
-                    attr("withdraw", net_amount.amount),
-                    attr("status", "success"),
-                ],
-                data: None,
-            })
+            let res = Response::new()
+                .add_message(msg_redeem)
+                .add_message(bank_msg)
+                .add_attribute("withdraw", net_amount.amount)
+                .add_attribute("status", "success");
+            Ok(res)
         }
         ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
     }
@@ -589,7 +546,10 @@ mod tests {
     use super::*;
     use crate::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event, ReplyOn};
+    use cosmwasm_std::{
+        coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event, ReplyOn,
+        SubMsgExecutionResponse,
+    };
     use cw20::Cw20ExecuteMsg;
 
     fn default_init(deps: DepsMut) {
@@ -630,7 +590,7 @@ mod tests {
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        assert_eq!(1, res.messages.len());
 
         // it worked, let's query the state
         //let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
@@ -656,11 +616,10 @@ mod tests {
         // Instantiate contract cw20
         let rep = Reply {
             id: 0,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "cw20")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "cw20")
+                ],
                 data: None,
             }),
         };
@@ -668,11 +627,10 @@ mod tests {
         // Instantiate contract staking
         let rep = Reply {
             id: 1,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "staking")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "staking")
+                ],
                 data: None,
             }),
         };
@@ -689,7 +647,7 @@ mod tests {
                 .addr_humanize(&state.staking_address)
                 .unwrap()
                 .to_string(),
-            amount: Uint128(99),
+            amount: Uint128::from(99_u128),
             msg: to_binary(&loterra_staking_contract_dogether::msg::ReceiveMsg::BondStake {})
                 .unwrap(),
             recipient: info.sender.to_string(),
@@ -697,19 +655,19 @@ mod tests {
         assert_eq!(
             res.messages,
             vec![
-                CosmosMsg::Wasm(WasmMsg::Execute {
+                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: "money".to_string(),
                     msg: to_binary(&deposit).unwrap(),
-                    send: vec![Coin {
+                    funds: vec![Coin {
                         denom: "uusd".to_string(),
-                        amount: Uint128(99)
+                        amount: Uint128::from(99_u128)
                     }]
-                }),
-                CosmosMsg::Wasm(WasmMsg::Execute {
+                })),
+                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: "cw20".to_string(),
                     msg: to_binary(&bond).unwrap(),
-                    send: vec![]
-                })
+                    funds: vec![]
+                }))
             ]
         )
     }
@@ -722,37 +680,38 @@ mod tests {
         // Instantiate contract staking
         let rep = Reply {
             id: 1,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "staking")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "staking")
+                ],
                 data: None,
             }),
         };
         let res = reply(deps.as_mut(), env.clone(), rep).unwrap();
 
         let msg = ExecuteMsg::UnPool {
-            amount: Uint128(1_000),
+            amount: Uint128::from(1_000_u128),
         };
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         let un_bond_msg = loterra_staking_contract_dogether::msg::ExecuteMsg::UnbondStake {
-            amount: Uint128(1_000),
+            amount: Uint128::from(1_000_u128),
             address: "addr0000".to_string(),
         };
         println!("{:?}", res);
 
         assert_eq!(
             res.messages,
-            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: "staking".to_string(),
                 msg: to_binary(&un_bond_msg).unwrap(),
-                send: vec![]
-            })]
+                funds: vec![]
+            }))]
         );
 
-        let msg = ExecuteMsg::UnPool { amount: Uint128(0) };
+        let msg = ExecuteMsg::UnPool {
+            amount: Uint128::zero(),
+        };
         let res = execute(deps.as_mut(), env, info, msg);
         match res {
             Err(ContractError::EmptyAmount {}) => {}
@@ -768,11 +727,10 @@ mod tests {
         // Instantiate contract staking
         let rep = Reply {
             id: 1,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "staking")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "staking")
+                ],
                 data: None,
             }),
         };
@@ -787,33 +745,21 @@ mod tests {
         let wasm_msg = WasmMsg::Execute {
             contract_addr: "staking".to_string(),
             msg: to_binary(&msg).unwrap(),
-            send: vec![],
+            funds: vec![],
         };
-        let submessage = SubMsg {
-            id: 2,
-            msg: CosmosMsg::Wasm(wasm_msg),
-            gas_limit: None,
-            reply_on: ReplyOn::Success,
-        };
-        assert_eq!(
-            res,
-            Response {
-                submessages: vec![submessage],
-                messages: vec![],
-                attributes: vec![],
-                data: None
-            }
-        )
+
+        let submessage = SubMsg::reply_on_success(CosmosMsg::Wasm(wasm_msg), 2);
+        assert_eq!(res, Response::new().add_submessage(submessage))
     }
     #[test]
     fn redeem_earning() {
         let mut deps = mock_dependencies(&[Coin {
             denom: "uusd".to_string(),
-            amount: Uint128(7_500_000_000),
+            amount: Uint128::from(7_500_000_000_u128),
         }]);
         default_init(deps.as_mut());
         let mut state = read_state(deps.as_ref().storage).unwrap();
-        state.total_ust_pool = Uint128(150_000_000_000);
+        state.total_ust_pool = Uint128::from(150_000_000_000_u128);
         store_state(deps.as_mut().storage, &state).unwrap();
         // Sending funds error
         let info = mock_info("addr0000", &coins(100, "uusd"));
@@ -821,11 +767,10 @@ mod tests {
         // Instantiate contract cw20
         let rep = Reply {
             id: 0,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "cw20")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "cw20")
+                ],
                 data: None,
             }),
         };
@@ -833,11 +778,10 @@ mod tests {
         // Instantiate contract staking
         let rep = Reply {
             id: 1,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "staking")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "staking")
+                ],
                 data: None,
             }),
         };
@@ -866,25 +810,26 @@ mod tests {
             loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
         let redeem = cw20::Cw20ExecuteMsg::Send {
             contract: "money".to_string(),
-            amount: Uint128(7_142_857_142),
-            msg: Some(to_binary(&Anchor::RedeemStable {}).unwrap()),
+            amount: Uint128::from(7_142_857_142_u128),
+            msg: to_binary(&Anchor::RedeemStable {}).unwrap(),
         };
+
         assert_eq!(
             res.messages,
             vec![
-                CosmosMsg::Wasm(WasmMsg::Execute {
+                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: "aust".to_string(),
                     msg: to_binary(&redeem).unwrap(),
-                    send: vec![]
-                }),
-                CosmosMsg::Wasm(WasmMsg::Execute {
+                    funds: vec![]
+                })),
+                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: "staking".to_string(),
                     msg: to_binary(&update_global_index).unwrap(),
-                    send: vec![Coin {
+                    funds: vec![Coin {
                         denom: "uusd".to_string(),
-                        amount: Uint128(7_499_000_000)
+                        amount: Uint128::from(7_499_000_000_u128)
                     }]
-                })
+                }))
             ]
         )
     }
@@ -914,11 +859,10 @@ mod tests {
         let state_before = read_state(deps.as_ref().storage).unwrap();
         let rep = Reply {
             id: 0,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "cw20")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "cw20")
+                ],
                 data: None,
             }),
         };
@@ -940,27 +884,17 @@ mod tests {
             admin: None,
             code_id: 1,
             msg: to_binary(&msg).unwrap(),
-            send: vec![],
+            funds: vec![],
             label: "".to_string(),
         });
-        let sub_msg = SubMsg {
-            id: 1,
-            msg: instantiate_staking,
-            gas_limit: None,
-            reply_on: ReplyOn::Success,
-        };
+        let submessage = SubMsg::reply_on_success(instantiate_staking, 1);
         assert_eq!(
             res,
-            Response {
-                submessages: vec![sub_msg],
-                messages: vec![],
-                attributes: vec![
-                    attr("cw20-address", "cw20"),
-                    attr("cw20-instantiate", "success")
-                ],
-                data: None
-            }
-        )
+            Response::new()
+                .add_submessage(submessage)
+                .add_attribute("cw20-address", "cw20")
+                .add_attribute("cw20-instantiate", "success")
+        );
     }
 
     #[test]
@@ -970,13 +904,13 @@ mod tests {
         let info = mock_info("addr0000", &[]);
         let mut env = mock_env();
         let state_before = read_state(deps.as_ref().storage).unwrap();
+
         let rep = Reply {
             id: 1,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "instantiate_contract".to_string(),
-                    attributes: vec![attr("contract_address", "staking")],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![
+                    Event::new("instantiate_contract").add_attribute("contract_address", "staking")
+                ],
                 data: None,
             }),
         };
@@ -994,16 +928,10 @@ mod tests {
 
         assert_eq!(
             res,
-            Response {
-                submessages: vec![],
-                messages: vec![],
-                attributes: vec![
-                    attr("staking-address", "staking"),
-                    attr("staking-instantiate", "success")
-                ],
-                data: None
-            }
-        )
+            Response::new()
+                .add_attribute("staking-address", "staking")
+                .add_attribute("staking-instantiate", "success")
+        );
     }
 
     #[test]
@@ -1013,19 +941,15 @@ mod tests {
         let info = mock_info("addr0000", &[]);
         let mut env = mock_env();
         let mut state_before = read_state(deps.as_ref().storage).unwrap();
-        state_before.total_ust_pool = Uint128(150_000_000_000);
+        state_before.total_ust_pool = Uint128::from(150_000_000_000_u128);
         store_state(deps.as_mut().storage, &state_before).unwrap();
 
         let rep = Reply {
             id: 2,
-            result: ContractResult::Ok(SubcallResponse {
-                events: vec![Event {
-                    kind: "message".to_string(),
-                    attributes: vec![
-                        attr("withdraw", "100000000000"),
-                        attr("recipient", "addr0008"),
-                    ],
-                }],
+            result: ContractResult::Ok(SubMsgExecutionResponse {
+                events: vec![Event::new("message")
+                    .add_attribute("withdraw", "100000000000")
+                    .add_attribute("recipient", "addr0008")],
                 data: None,
             }),
         };
@@ -1038,35 +962,34 @@ mod tests {
             state.total_ust_pool,
             state_before
                 .total_ust_pool
-                .checked_sub(Uint128(100_000_000_000))
+                .checked_sub(Uint128::from(100_000_000_000_u128))
                 .unwrap()
         );
         println!("{:?}", res);
         let msg_to = Cw20ExecuteMsg::Send {
             contract: "money".to_string(),
-            amount: Uint128(95_238_095_238),
-            msg: Some(to_binary(&Anchor::RedeemStable {}).unwrap()),
+            amount: Uint128::from(95_238_095_238_u128),
+            msg: to_binary(&Anchor::RedeemStable {}).unwrap(),
         };
         let wasm_msg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "aust".to_string(),
             msg: to_binary(&msg_to).unwrap(),
-            send: vec![],
+            funds: vec![],
         });
         let cosmos_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: "addr0008".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: Uint128(99_999_000_000),
+                amount: Uint128::from(99_999_000_000_u128),
             }],
         });
         assert_eq!(
             res,
-            Response {
-                submessages: vec![],
-                messages: vec![wasm_msg, cosmos_msg],
-                attributes: vec![attr("withdraw", "99999000000"), attr("status", "success")],
-                data: None
-            }
+            Response::new()
+                .add_message(wasm_msg)
+                .add_message(cosmos_msg)
+                .add_attribute("withdraw", "99999000000")
+                .add_attribute("status", "success")
         )
     }
 }

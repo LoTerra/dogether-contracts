@@ -45,15 +45,9 @@ pub fn handle_update_global_index(
 
     STATE.save(deps.storage, &state)?;
 
-    let res = Response {
-        submessages: vec![],
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "update_global_index"),
-            attr("claimed_rewards", claimed_rewards),
-        ],
-    };
+    let res = Response::new()
+        .add_attribute("action", "update_global_index")
+        .add_attribute("claimed_rewards", claimed_rewards);
 
     Ok(res)
 }

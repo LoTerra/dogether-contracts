@@ -48,7 +48,7 @@ pub fn claim_tokens(
     block: &BlockInfo,
     cap: Option<Uint128>,
 ) -> StdResult<Uint128> {
-    let mut to_send = Uint128(0);
+    let mut to_send = Uint128::zero();
     CLAIM.update(storage, addr.as_slice(), |claim| -> StdResult<_> {
         let (_send, waiting): (Vec<_>, _) =
             claim.unwrap_or_default().iter().cloned().partition(|c| {
