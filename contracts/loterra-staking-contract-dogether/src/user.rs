@@ -4,8 +4,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::claim::{claim_tokens, create_claim};

@@ -1,7 +1,7 @@
 use crate::state::{CONFIG, STATE};
 
 use crate::math::decimal_summation_in_256;
-use cosmwasm_std::{attr, Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
+use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 
 /// Increase global_index according to claimed rewards amount
 /// Only hub_contract is allowed to execute

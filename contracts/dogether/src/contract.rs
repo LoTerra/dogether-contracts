@@ -1,22 +1,18 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Addr, BankMsg, Binary, CanonicalAddr, Coin, ContractResult,
-    CosmosMsg, Decimal, Deps, DepsMut, Env, Fraction, MessageInfo, Reply, ReplyOn, Response,
-    StdError, StdResult, SubMsg, SubMsgExecutionResponse, Uint128, Uint64, WasmMsg, WasmQuery,
+    entry_point, to_binary, Addr, BankMsg, Binary, Coin, ContractResult, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg, SubMsgExecutionResponse,
+    Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
-use crate::math::{
-    decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256,
-};
-use crate::msg::{Anchor, CountResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
+use crate::msg::{Anchor, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{read_config, read_state, store_config, store_state, Config, State};
 use crate::taxation::deduct_tax;
-use cosmwasm_bignumber::{Decimal256, Uint256};
+use cosmwasm_bignumber::Decimal256;
 use cw20;
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
-use std::ops::{Mul, Sub};
-use std::str::FromStr;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -163,7 +159,7 @@ pub fn try_un_pool(
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let mut state = read_state(deps.storage)?;
+    let state = read_state(deps.storage)?;
     let _config = read_config(deps.storage)?;
     /*
        We should probably query staking contract in order to check the user balance ?
@@ -192,7 +188,7 @@ pub fn try_claim_un_pool(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let mut state = read_state(deps.storage)?;
+    let state = read_state(deps.storage)?;
     /*
        Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
@@ -530,10 +526,8 @@ pub fn withdraw_reply(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        _ => Ok(Default::default()),
-    }
+pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
+    Ok(Default::default())
 }
 
 /*

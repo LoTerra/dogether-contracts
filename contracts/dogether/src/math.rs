@@ -9,14 +9,6 @@ pub fn decimal_multiplication_in_256(a: Decimal, b: Decimal) -> Decimal {
     c_u256
 }
 
-/// return a + b
-pub fn decimal_summation_in_256(a: Decimal, b: Decimal) -> Decimal {
-    let a_u256: Decimal256 = a.into();
-    let b_u256: Decimal256 = b.into();
-    let c_u256: Decimal = (b_u256 + a_u256).into();
-    c_u256
-}
-
 /// return a - b
 pub fn decimal_subtraction_in_256(a: Decimal, b: Decimal) -> Decimal {
     let a_u256: Decimal256 = a.into();
@@ -40,14 +32,6 @@ mod tests {
     }
 
     #[test]
-    fn test_decimal_sumation() {
-        let a = Decimal::from_ratio(Uint128::from(20_u128), Uint128::from(50_u128));
-        let b = Decimal::from_ratio(Uint128::from(10_u128), Uint128::from(50_u128));
-        let res = decimal_summation_in_256(a, b);
-        assert_eq!(res.to_string(), "0.6");
-    }
-
-    #[test]
     fn test_decimal_subtraction() {
         let a = Decimal::from_ratio(Uint128::from(20_u128), Uint128::from(50_u128));
         let b = Decimal::from_ratio(Uint128::from(10_u128), Uint128::from(50_u128));
@@ -62,14 +46,6 @@ mod tests {
         let multiplication =
             decimal_multiplication_in_256(Decimal::from_ratio(a, Uint128::from(1_u128)), b);
         assert_eq!(multiplication.to_string(), "11.11111");
-    }
-
-    #[test]
-    fn test_decimal_sumation_in_256() {
-        let a = Decimal::from_ratio(Uint128::from(20_u128), Uint128::from(50_u128));
-        let b = Decimal::from_ratio(Uint128::from(10_u128), Uint128::from(50_u128));
-        let res = decimal_summation_in_256(a, b);
-        assert_eq!(res.to_string(), "0.6");
     }
 
     #[test]
