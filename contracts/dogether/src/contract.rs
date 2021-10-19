@@ -1,3 +1,4 @@
+use std::ops::{Add, Mul};
 use cosmwasm_std::{
     entry_point, to_binary, Addr, BankMsg, Binary, Coin, ContractResult, CosmosMsg, Decimal, Deps,
     DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg, SubMsgExecutionResponse,
@@ -11,6 +12,7 @@ use crate::state::{read_config, read_state, store_config, store_state, Config, S
 use crate::taxation::deduct_tax;
 use cosmwasm_bignumber::Decimal256;
 use cw20;
+use cw20::{BalanceResponse, Cw20QueryMsg};
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
 
@@ -129,7 +131,7 @@ pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response,
         amount: deduct_tax(
             &deps.querier,
             Coin {
-                denom: config.denom,
+                denom: config.denom.clone(),
                 amount: sent,
             },
         )?
@@ -145,7 +147,13 @@ pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response,
     };
 
     // Add UST amount pooled
-    state.total_ust_pool = state.total_ust_pool.checked_add(sent).unwrap();
+    state.total_ust_pool = state.total_ust_pool.checked_add(deduct_tax(
+        &deps.querier,
+        Coin {
+            denom: config.denom,
+            amount: sent,
+        },
+    )?.amount).unwrap();
     store_state(deps.storage, &state)?;
 
     let res = Response::new()
@@ -244,14 +252,27 @@ pub fn try_redeem_earning(
         msg: to_binary(&epoch)?,
     };
     let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
+
+    // Query balance of aust
+    let balance_aust_msg = Cw20QueryMsg::Balance { address: env.contract.address.to_string() };
+    let query_balance_aust_msg = WasmQuery::Smart {
+        contract_addr: deps.api.addr_humanize(&config.anchor_aust_address)?.to_string(),
+        msg: to_binary(&balance_aust_msg)?
+    };
+    let balance_aust: BalanceResponse = deps.querier.query(&query_balance_aust_msg.into())?;
+
     let total_ust_pool = Decimal::from_ratio(state.total_ust_pool, Uint128::from(1_u128));
-    let total_with_interest_ust =
-        decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
-    let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
+    let total_aust_balance = Decimal::from_ratio(balance_aust.balance, Uint128::from(1_u128));
+    let total_aust_to_ust = decimal_multiplication_in_256(total_aust_balance, res.exchange_rate.into());
+    // let total_with_interest_ust = decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
+
+    // let interest_accrued = (total_aust_to_ust * Uint128::from(1u128)).checked_sub(state.total_ust_pool).unwrap_or_default();
+    let interest_accrued_ust = decimal_subtraction_in_256(total_aust_to_ust, total_ust_pool);
+    //let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
     //let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
     //println!("{}", interest_a_ust_decimal);
-    let interest_a_ust_decimal =
-        Decimal256::from_ratio(Decimal256::from(interest_ust).0, res.exchange_rate.0);
+    let interest_a_ust_decimal = Decimal256::from_ratio(Decimal256::from(interest_accrued_ust).0, res.exchange_rate.0);
+
     //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
     // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
     //decimal_summation_in_256(interest_ust, Decimal::from_ratio(interest_ust, res.exchange_rate));
@@ -280,11 +301,12 @@ pub fn try_redeem_earning(
         msg: to_binary(&redeem)?,
         funds: vec![],
     };
-
+    let precision_amount_to_send =
+        decimal_multiplication_in_256(Decimal::from_ratio(interest_to_withdraw, Uint128::from(1_u128)), res.exchange_rate.into());
     // Get the total contract balance and send all ust to staking contract
-    let contract_balance = deps
+    let contract_balance = (precision_amount_to_send * Uint128::from(1_u128)).add( deps
         .querier
-        .query_balance(env.contract.address, config.denom.clone())?;
+        .query_balance(env.contract.address.clone(), config.denom.clone())?.amount);
 
     /*
        Send earning to staking contract
@@ -298,7 +320,7 @@ pub fn try_redeem_earning(
             &deps.querier,
             Coin {
                 denom: config.denom,
-                amount: contract_balance.amount,
+                amount: contract_balance,
             },
         )?],
     };
@@ -420,7 +442,7 @@ pub fn staking_instance_reply(
 
 pub fn withdraw_reply(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     msg: ContractResult<SubMsgExecutionResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
@@ -430,7 +452,7 @@ pub fn withdraw_reply(
             let (withdrawing_amount, recipient) = subcall
                 .events
                 .into_iter()
-                .find(|e| e.ty == "message")
+                .find(|e| e.ty == "wasm")
                 .and_then(|ev| {
                     let amount = ev
                         .attributes
@@ -446,7 +468,7 @@ pub fn withdraw_reply(
                     Some((amount, recipient))
                 })
                 .unwrap();
-            let amount_to_withdraw =
+            let amount_to_withdraw_in_ust =
                 Uint128::from(withdrawing_amount.unwrap().parse::<u128>().unwrap());
 
             /*
@@ -464,11 +486,12 @@ pub fn withdraw_reply(
                 msg: to_binary(&epoch)?,
             };
             let res: EpochStateResponse = deps.querier.query(&msg_epoch.into())?;
-            let total_ust_pool = Decimal::from_ratio(amount_to_withdraw, Uint128::from(1_u128));
+            let total_ust_pool = Decimal::from_ratio(amount_to_withdraw_in_ust, Uint128::from(1_u128));
             let interest_a_ust_decimal =
                 Decimal256::from_ratio(Decimal256::from(total_ust_pool).0, res.exchange_rate.0);
             let interest_to_withdraw =
                 Decimal::from(interest_a_ust_decimal) * Uint128::from(1_u128);
+
             /*
                 Redeem stable coin from anchor
             */
@@ -488,18 +511,19 @@ pub fn withdraw_reply(
                 msg: to_binary(&redeem)?,
                 funds: vec![],
             };
-            // Get the total contract balance and send ust
-            let contract_balance = deps
-                .querier
-                .query_balance(env.contract.address, config.denom.clone())?;
 
-            if contract_balance.amount >= amount_to_withdraw {
-                return Err(ContractError::NotEnoughFunds {});
-            }
+            // // Get the total contract balance and send ust
+            // let contract_balance = deps
+            //     .querier
+            //     .query_balance(env.contract.address, config.denom.clone())?;
+            //
+            // if contract_balance.amount >= amount_to_withdraw {
+            //     return Err(ContractError::NotEnoughFunds {});
+            // }
 
             state.total_ust_pool = state
                 .total_ust_pool
-                .checked_sub(amount_to_withdraw)
+                .checked_sub(amount_to_withdraw_in_ust)
                 .unwrap();
             store_state(deps.storage, &state)?;
 
@@ -507,13 +531,15 @@ pub fn withdraw_reply(
                 &deps.querier,
                 Coin {
                     denom: config.denom.clone(),
-                    amount: amount_to_withdraw,
+                    amount: amount_to_withdraw_in_ust,
                 },
             )?;
+
             let bank_msg = CosmosMsg::Bank(BankMsg::Send {
                 to_address: recipient.unwrap(),
                 amount: vec![net_amount.clone()],
             });
+
             let res = Response::new()
                 .add_message(msg_redeem)
                 .add_message(bank_msg)
@@ -524,6 +550,7 @@ pub fn withdraw_reply(
         ContractResult::Err(_) => Err(ContractError::Unauthorized {}),
     }
 }
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
@@ -821,7 +848,7 @@ mod tests {
                     msg: to_binary(&update_global_index).unwrap(),
                     funds: vec![Coin {
                         denom: "uusd".to_string(),
-                        amount: Uint128::from(7_499_000_000_u128)
+                        amount: Uint128::from(14_998_999_999u128)
                     }]
                 }))
             ]
@@ -941,7 +968,7 @@ mod tests {
         let rep = Reply {
             id: 2,
             result: ContractResult::Ok(SubMsgExecutionResponse {
-                events: vec![Event::new("message")
+                events: vec![Event::new("wasm")
                     .add_attribute("withdraw", "100000000000")
                     .add_attribute("recipient", "addr0008")],
                 data: None,
@@ -974,7 +1001,7 @@ mod tests {
             to_address: "addr0008".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: Uint128::from(99_999_000_000_u128),
+                amount: Uint128::from(99999000000_u128),
             }],
         });
         assert_eq!(

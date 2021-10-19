@@ -1,7 +1,7 @@
 use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_slice, to_binary, Addr, Api, BalanceResponse, BankQuery, Binary, Coin, ContractResult,
+    from_slice, to_binary, Addr, Api, BankQuery, Binary, Coin, ContractResult,
     Decimal, OwnedDeps, Querier, QuerierResult, QueryRequest, Response, StdError, StdResult,
     SystemError, SystemResult, Uint128, WasmQuery,
 };
@@ -11,7 +11,7 @@ use terra_cosmwasm::{
     ExchangeRateItem, ExchangeRatesResponse, TaxCapResponse, TaxRateResponse, TerraQuery,
     TerraQueryWrapper, TerraRoute,
 };
-
+use cw20::BalanceResponse;
 //pub const MOCK_HUB_CONTRACT_ADDR: &str = "hub";
 //pub const MOCK_CW20_CONTRACT_ADDR: &str = "lottery";
 //pub const MOCK_REWARD_CONTRACT_ADDR: &str = "reward";
@@ -64,6 +64,9 @@ impl WasmMockQuerier {
                         exchange_rate: Decimal256::from(d),
                         aterra_supply: Uint256::zero(),
                     };
+                    return SystemResult::Ok(ContractResult::from(to_binary(&res)));
+                }else if contract_addr == "aust" {
+                    let res = BalanceResponse{ balance: Uint128::from(150_000_000_000u128)};
                     return SystemResult::Ok(ContractResult::from(to_binary(&res)));
                 }
                 panic!("DO NOT ENTER HERE")
