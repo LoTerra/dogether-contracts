@@ -276,26 +276,12 @@ pub fn try_redeem_earning(
     let total_aust_balance = Decimal::from_ratio(balance_aust.balance, Uint128::from(1_u128));
     let total_aust_to_ust =
         decimal_multiplication_in_256(total_aust_balance, res.exchange_rate.into());
-    // let total_with_interest_ust = decimal_multiplication_in_256(total_ust_pool, res.exchange_rate.into());
-
-    // let interest_accrued = (total_aust_to_ust * Uint128::from(1u128)).checked_sub(state.total_ust_pool).unwrap_or_default();
     let interest_accrued_ust = decimal_subtraction_in_256(total_aust_to_ust, total_ust_pool);
-    //let interest_ust = decimal_subtraction_in_256(total_with_interest_ust, total_ust_pool);
-    //let interest_a_ust_decimal = Decimal256::from(interest_ust) / res.exchange_rate;
-    //println!("{}", interest_a_ust_decimal);
     let interest_a_ust_decimal = Decimal256::from_ratio(
         Decimal256::from(interest_accrued_ust).0,
         res.exchange_rate.0,
     );
-
-    //let interest_to_withdraw =Uint256::from(interest_a_ust.0);
-    // let x = Uint128::from(Decimal::from(interest_a_ust.into()));
-    //decimal_summation_in_256(interest_ust, Decimal::from_ratio(interest_ust, res.exchange_rate));
     let interest_to_withdraw = Decimal::from(interest_a_ust_decimal) * Uint128::from(1_u128);
-
-    //println!("{:?}", get_decimals(interest_a_ust));
-    //let all_reward_with_decimals =  decimal_summation_in_256( Decimal::from_ratio(Uint128(7500000000), Uint128(1)), get_decimals(interest_a_ust)?);
-    //println!("{}", all_reward_with_decimals);
 
     /*
           Redeem stable coin from anchor
@@ -358,25 +344,6 @@ pub fn try_redeem_earning(
     Ok(res)
 }
 
-/*pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(Response::default())
-}
-
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(Response::default())
-}*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     match msg.id {
@@ -538,15 +505,6 @@ pub fn withdraw_reply(
                 funds: vec![],
             };
 
-            // // Get the total contract balance and send ust
-            // let contract_balance = deps
-            //     .querier
-            //     .query_balance(env.contract.address, config.denom.clone())?;
-            //
-            // if contract_balance.amount >= amount_to_withdraw {
-            //     return Err(ContractError::NotEnoughFunds {});
-            // }
-
             state.total_ust_pool = state
                 .total_ust_pool
                 .checked_sub(amount_to_withdraw_in_ust)
@@ -573,7 +531,7 @@ pub fn withdraw_reply(
                 to_address: recipient.unwrap(),
                 amount: vec![net_amount.clone()],
             });
-            //let sub_msg = SubMsg::reply_on_success(CosmosMsg::Wasm(msg_redeem), 3);
+
             let res = Response::new()
                 .add_message(msg_redeem)
                 .add_message(bank_msg)
@@ -590,11 +548,6 @@ pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
     Ok(Default::default())
 }
 
-/*
-fn query_count(deps: Deps) -> StdResult<u64> {
-    Ok(10)
-}
-*/
 #[cfg(test)]
 mod tests {
     use super::*;
