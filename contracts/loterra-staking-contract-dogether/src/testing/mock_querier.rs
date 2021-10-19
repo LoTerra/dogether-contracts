@@ -63,13 +63,16 @@ impl WasmMockQuerier {
                         prize_rank_winner_percentage: vec![],
                         poll_count: 0,
                         poll_default_end_height: 0,
-                        price_per_ticket_to_register: Uint128(1),
+                        price_per_ticket_to_register: Uint128::from(1_u128),
                         terrand_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
                         loterra_cw20_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
                         loterra_staking_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
+                        altered_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
                         safe_lock: false,
                         lottery_counter: 0,
                         holders_bonus_block_time_end: 0,
+                        bonus_burn_rate: 0,
+                        bonus: 0,
                     };
                     return SystemResult::Ok(ContractResult::from(to_binary(&res)));
                 }
@@ -83,7 +86,7 @@ impl WasmMockQuerier {
                     SystemResult::Ok(ContractResult::from(to_binary(&res)))
                 }
                 TerraQuery::TaxCap { denom: _ } => {
-                    let cap = Uint128(1000000u128);
+                    let cap = Uint128::from(1000000_u128);
                     let res = TaxCapResponse { cap };
                     SystemResult::Ok(ContractResult::from(to_binary(&res)))
                 }

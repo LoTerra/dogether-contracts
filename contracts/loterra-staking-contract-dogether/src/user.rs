@@ -4,8 +4,8 @@ use crate::state::{
 };
 
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::claim::{claim_tokens, create_claim};
@@ -41,7 +41,7 @@ pub fn handle_get_ticket(
 
     // let decimals = get_decimals(all_reward_with_decimals).unwrap();
 
-    let rewards = all_reward_with_decimals * Uint128(1);
+    let rewards = all_reward_with_decimals * Uint128::from(1_u128);
 
     if rewards.is_zero() {
         return Err(StdError::generic_err("No rewards have accrued yet"));
@@ -64,7 +64,7 @@ pub fn handle_get_ticket(
     let query_loterra: loterra::msg::ConfigResponse = deps.querier.query(&msg_query.into())?;
     let price_per_ticket = query_loterra.price_per_ticket_to_register;
     // Total ticket cost
-    let total_ticket_cost = Uint128(price_per_ticket.u128() * combination.len() as u128);
+    let total_ticket_cost = Uint128::from(price_per_ticket.u128() * combination.len() as u128);
     // Total ticket cost minus fees
     let total_ticket_cost_net = deduct_tax(
         &deps.querier,
@@ -133,37 +133,31 @@ pub fn handle_get_ticket(
     */
     holder.pending_rewards = Decimal::from_ratio(
         rewards.checked_sub(total_ticket_with_fees).unwrap(),
-        Uint128(1),
+        Uint128::from(1_u128),
     );
     holder.index = state.global_index;
     store_holder(deps.storage, &holder_addr_raw, &holder)?;
 
     let msg_loterra = loterra::msg::ExecuteMsg::Register {
-        address: Some(recipient.clone()),
+        address: Some(deps.api.addr_validate(&recipient.clone())?),
+        altered_bonus: None,
         combination: combination.clone(),
     };
     let execute = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
         msg: to_binary(&msg_loterra)?,
-        send: vec![deduct_tax(
-            &deps.querier,
-            Coin {
-                denom: config.reward_denom,
-                amount: total_ticket_with_fees,
-            },
-        )?],
+        funds: vec![Coin {
+            denom: config.reward_denom,
+            amount: total_ticket_cost,
+        }],
     };
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![execute.into()],
-        data: None,
-        attributes: vec![
-            attr("action", "get_ticket"),
-            attr("player_address", recipient),
-            attr("ticket_number", combination.len()),
-        ],
-    })
+    let res = Response::new()
+        .add_message(execute)
+        .add_attribute("action", "get_ticket")
+        .add_attribute("player_address", recipient)
+        .add_attribute("ticket_number", combination.len().to_string());
+    Ok(res)
 }
 
 pub fn handle_receive(
@@ -217,17 +211,10 @@ pub fn handle_bond(
     store_holder(deps.storage, &address_raw, &holder)?;
     STATE.save(deps.storage, &state)?;
 
-    let res = Response {
-        submessages: vec![],
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "bond_stake"),
-            attr("holder_address", holder_addr),
-            attr("amount", amount),
-        ],
-    };
-
+    let res = Response::new()
+        .add_attribute("action", "bond_stake")
+        .add_attribute("holder_address", holder_addr)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -275,17 +262,10 @@ pub fn handle_unbound(
     let release_height = Expiration::AtHeight(env.block.height + config.unbonding_period);
     create_claim(deps.storage, address_raw, amount, release_height)?;
 
-    let res = Response {
-        submessages: vec![],
-        messages: vec![],
-        data: None,
-        attributes: vec![
-            attr("action", "unbond_stake"),
-            attr("holder_address", info.sender),
-            attr("amount", amount),
-        ],
-    };
-
+    let res = Response::new()
+        .add_attribute("action", "unbond_stake")
+        .add_attribute("holder_address", info.sender)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -314,19 +294,15 @@ pub fn handle_withdraw_stake(
     let msg = WasmMsg::Execute {
         contract_addr: cw20_human_addr.to_string(),
         msg: to_binary(&cw20_burn_msg)?,
-        send: vec![],
+        funds: vec![],
     };
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![msg.into()],
-        data: None,
-        attributes: vec![
-            attr("action", "withdraw_stake"),
-            attr("recipient", address),
-            attr("withdraw", amount),
-        ],
-    })
+    let res = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "withdraw_stake")
+        .add_attribute("recipient", address)
+        .add_attribute("withdraw", amount);
+    Ok(res)
 }
 
 pub fn query_accrued_rewards(deps: Deps, address: String) -> StdResult<AccruedRewardsResponse> {
@@ -338,7 +314,7 @@ pub fn query_accrued_rewards(deps: Deps, address: String) -> StdResult<AccruedRe
     let all_reward_with_decimals =
         decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
 
-    let rewards = all_reward_with_decimals * Uint128(1);
+    let rewards = all_reward_with_decimals * Uint128::from(1_u128);
 
     Ok(AccruedRewardsResponse { rewards })
 }
@@ -375,7 +351,7 @@ fn calculate_decimal_rewards(
     user_index: Decimal,
     user_balance: Uint128,
 ) -> StdResult<Decimal> {
-    let decimal_balance = Decimal::from_ratio(user_balance, Uint128(1));
+    let decimal_balance = Decimal::from_ratio(user_balance, Uint128::from(1_u128));
     Ok(decimal_multiplication_in_256(
         decimal_subtraction_in_256(global_index, user_index),
         decimal_balance,
@@ -403,9 +379,9 @@ mod tests {
 
     #[test]
     pub fn proper_calculate_rewards() {
-        let global_index = Decimal::from_ratio(Uint128(9), Uint128(100));
+        let global_index = Decimal::from_ratio(Uint128::from(9_u128), Uint128::from(100_u128));
         let user_index = Decimal::zero();
-        let user_balance = Uint128(1000);
+        let user_balance = Uint128::from(1000_u128);
         let reward = calculate_decimal_rewards(global_index, user_index, user_balance).unwrap();
         assert_eq!(reward.to_string(), "90");
     }

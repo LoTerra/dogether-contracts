@@ -1,4 +1,4 @@
-use cosmwasm_std::{Binary, CanonicalAddr, StdResult, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint128};
 use cw_storage_plus::Item;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
