@@ -21,7 +21,7 @@ use loterra_staking_contract_dogether;
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
@@ -51,7 +51,7 @@ pub fn instantiate(
     store_state(deps.storage, &state)?;
 
     let instantiation_cw20 = WasmMsg::Instantiate {
-        admin: None,
+        admin: Some(env.contract.address.to_string()),
         code_id: msg.code_id_cw20,
         msg: msg.message_cw20,
         label: msg.label_cw20,
@@ -389,7 +389,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
 
 pub fn cw20_instance_reply(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     msg: ContractResult<SubMsgExecutionResponse>,
 ) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
@@ -417,7 +417,7 @@ pub fn cw20_instance_reply(
                 unbonding_period: config.unbonding_period,
             };
             let instantiation_staking = WasmMsg::Instantiate {
-                admin: None,
+                admin: Some(env.contract.address.to_string()),
                 code_id: config.code_id_staking,
                 msg: to_binary(&data)?,
                 funds: vec![],
