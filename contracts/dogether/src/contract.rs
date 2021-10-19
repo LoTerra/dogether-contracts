@@ -599,7 +599,7 @@ fn query_count(deps: Deps) -> StdResult<u64> {
 mod tests {
     use super::*;
     use crate::mock_querier::mock_dependencies;
-    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{
         coins, from_binary, Api, Attribute, CosmosMsg, Empty, Event, ReplyOn,
         SubMsgExecutionResponse,
@@ -935,7 +935,7 @@ mod tests {
             unbonding_period: 100000,
         };
         let instantiate_staking = CosmosMsg::Wasm(WasmMsg::Instantiate {
-            admin: None,
+            admin: Some(MOCK_CONTRACT_ADDR.to_string()),
             code_id: 1,
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
