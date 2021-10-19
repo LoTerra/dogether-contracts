@@ -881,7 +881,7 @@ mod tests {
                     msg: to_binary(&update_global_index).unwrap(),
                     funds: vec![Coin {
                         denom: "uusd".to_string(),
-                        amount: Uint128::from(14_998_999_999u128)
+                        amount: Uint128::from(14998000000u128)
                     }]
                 }))
             ]
@@ -1034,7 +1034,7 @@ mod tests {
             to_address: "addr0008".to_string(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: Uint128::from(99999000000_u128),
+                amount: Uint128::from(99998000000_u128),
             }],
         });
         assert_eq!(
@@ -1042,7 +1042,7 @@ mod tests {
             Response::new()
                 .add_message(wasm_msg)
                 .add_message(cosmos_msg)
-                .add_attribute("withdraw", "99999000000")
+                .add_attribute("withdraw", "99998000000")
                 .add_attribute("status", "success")
         )
     }
