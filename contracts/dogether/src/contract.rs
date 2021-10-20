@@ -336,7 +336,7 @@ pub fn try_redeem_earning(
         )?],
     });
 
-    state.next_draw = env.block.time.plus_seconds(state.draw_period).seconds();
+    state.next_draw = state.next_draw.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
     let res = Response::new()
         .add_message(msg_redeem)
@@ -810,7 +810,7 @@ mod tests {
         assert!(state_before.next_draw < state.next_draw);
         assert_eq!(
             state.next_draw,
-            env.block.time.plus_seconds(state.draw_period).seconds()
+            state_before.next_draw.checked_add(state.draw_period).unwrap()
         );
         assert_eq!(state_before.draw_period, state.draw_period);
         assert_eq!(state_before.staking_address, state.staking_address);
