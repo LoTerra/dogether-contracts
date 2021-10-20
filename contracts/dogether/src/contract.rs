@@ -239,7 +239,7 @@ pub fn try_redeem_earning(
     if !info.funds.is_empty() {
         return Err(ContractError::DoNotSendFunds {});
     }
-    if env.block.height < state.next_draw {
+    if env.block.time.seconds() < state.next_draw {
         return Err(ContractError::RetryRedeemLater(state.next_draw));
     }
     /*
@@ -336,7 +336,7 @@ pub fn try_redeem_earning(
         )?],
     });
 
-    state.next_draw = env.block.height.checked_add(state.draw_period).unwrap();
+    state.next_draw = state.next_draw.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
     let res = Response::new()
         .add_message(msg_redeem)
@@ -808,7 +808,13 @@ mod tests {
         println!("{:?}", res);
         assert_eq!(state_before.total_ust_pool, state.total_ust_pool);
         assert!(state_before.next_draw < state.next_draw);
-        assert_eq!(state.next_draw, env.block.height + state.draw_period);
+        assert_eq!(
+            state.next_draw,
+            state_before
+                .next_draw
+                .checked_add(state.draw_period)
+                .unwrap()
+        );
         assert_eq!(state_before.draw_period, state.draw_period);
         assert_eq!(state_before.staking_address, state.staking_address);
         assert_eq!(state_before.cw20_address, state.cw20_address);
@@ -846,12 +852,14 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
         let info = mock_info("addr0000", &[]);
-        let mut env = mock_env();
-        env.block.height = 100;
+        let env = mock_env();
+        let mut state = read_state(deps.as_ref().storage).unwrap();
+        state.next_draw = env.block.time.plus_seconds(10000000).seconds();
+        store_state(deps.as_mut().storage, &state).unwrap();
         let res = try_redeem_earning(deps.as_mut(), env, info);
         match res {
             Err(ContractError::RetryRedeemLater(msg)) => {
-                assert_eq!(1000, msg)
+                assert_eq!(1581797419, msg)
             }
             _ => panic!("Do not enter here"),
         }
