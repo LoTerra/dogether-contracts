@@ -810,7 +810,10 @@ mod tests {
         assert!(state_before.next_draw < state.next_draw);
         assert_eq!(
             state.next_draw,
-            state_before.next_draw.checked_add(state.draw_period).unwrap()
+            state_before
+                .next_draw
+                .checked_add(state.draw_period)
+                .unwrap()
         );
         assert_eq!(state_before.draw_period, state.draw_period);
         assert_eq!(state_before.staking_address, state.staking_address);
