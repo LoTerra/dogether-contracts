@@ -1,20 +1,24 @@
 use cosmwasm_std::{
     entry_point, to_binary, Addr, BankMsg, Binary, Coin, ContractResult, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg,
-    SubMsgExecutionResponse, Uint128, WasmMsg, WasmQuery,
+    DepsMut, Env, MessageInfo, Reply, Response, StdResult, SubMsg, SubMsgExecutionResponse,
+    Uint128, WasmMsg, WasmQuery,
 };
-use std::ops::{Add, Mul};
 
 use crate::error::ContractError;
 use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
-use crate::msg::{Anchor, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{read_config, read_state, store_config, store_state, Config, State};
+use crate::msg::{
+    Anchor, ConfigResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+};
+use crate::state::{
+    read_config, read_state, store_config, store_state, Config, State, CONFIG, STATE,
+};
 use crate::taxation::deduct_tax;
 use cosmwasm_bignumber::Decimal256;
 use cw20;
 use cw20::{BalanceResponse, Cw20QueryMsg};
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
+use loterra_staking_contract_dogether::msg::MigrateMsg;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -544,8 +548,47 @@ pub fn withdraw_reply(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
-    Ok(Default::default())
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::State {} => to_binary(&query_state(deps)?),
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+    }
+}
+
+pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
+    let state = STATE.load(deps.storage)?;
+
+    Ok(StateResponse {
+        staking_address: deps.api.addr_humanize(&state.staking_address)?.to_string(),
+        cw20_address: deps.api.addr_humanize(&state.cw20_address)?.to_string(),
+        draw_period: state.draw_period,
+        next_draw: state.next_draw,
+        total_ust_pool: state.total_ust_pool,
+    })
+}
+
+pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let config = CONFIG.load(deps.storage)?;
+
+    Ok(ConfigResponse {
+        admin: deps.api.addr_humanize(&config.admin)?.to_string(),
+        denom: config.denom,
+        money_market_address: deps
+            .api
+            .addr_humanize(&config.money_market_address)?
+            .to_string(),
+        anchor_aust_address: deps
+            .api
+            .addr_humanize(&config.anchor_aust_address)?
+            .to_string(),
+        unbonding_period: config.unbonding_period,
+        loterra_address: deps.api.addr_humanize(&config.loterra_address)?.to_string(),
+    })
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
 }
 
 #[cfg(test)]
