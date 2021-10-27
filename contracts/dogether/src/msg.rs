@@ -33,7 +33,12 @@ pub enum ExecuteMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QueryMsg {}
+pub enum QueryMsg {
+    /// Query the state
+    State {},
+    /// Query the config
+    Config {},
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -55,9 +60,32 @@ pub enum Anchor {
 pub struct CountResponse {
     pub count: i32,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct StateResponse {
+    pub staking_address: String,
+    pub cw20_address: String,
+    pub draw_period: u64,
+    pub next_draw: u64,
+    pub total_ust_pool: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ConfigResponse {
+    pub admin: String,
+    pub denom: String,
+    pub money_market_address: String,
+    pub anchor_aust_address: String,
+    pub unbonding_period: u64,
+    pub loterra_address: String,
+}
+
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EpochStateResponse {
     pub exchange_rate: Decimal256,
     pub aterra_supply: Uint256,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConfigResponse",
+  "type": "object",
+  "required": [
+    "admin",
+    "anchor_aust_address",
+    "denom",
+    "loterra_address",
+    "money_market_address",
+    "unbonding_period"
+  ],
+  "properties": {
+    "admin": {
+      "type": "string"
+    },
+    "anchor_aust_address": {
+      "type": "string"
+    },
+    "denom": {
+      "type": "string"
+    },
+    "loterra_address": {
+      "type": "string"
+    },
+    "money_market_address": {
+      "type": "string"
+    },
+    "unbonding_period": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  }
+}
