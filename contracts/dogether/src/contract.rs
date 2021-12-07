@@ -307,36 +307,10 @@ pub fn try_redeem_earning(
         funds: vec![],
     });
 
-    let precision_amount_to_send = deduct_tax(
-        &deps.querier,
-        Coin {
-            denom: config.denom.clone(),
-            amount: Uint128::from(interest_accrued_ust * Uint128::from(1_u128)),
-        },
-    )?;
-
-    /*
-       Send earning to staking contract
-    */
-    let update_global_index =
-        loterra_staking_contract_dogether::msg::ExecuteMsg::UpdateGlobalIndex {};
-    let msg_update_global_index = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
-        msg: to_binary(&update_global_index)?,
-        funds: vec![deduct_tax(
-            &deps.querier,
-            Coin {
-                denom: config.denom,
-                amount: precision_amount_to_send.amount,
-            },
-        )?],
-    });
-
     state.next_draw = state.next_draw.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
     let res = Response::new()
-        .add_message(msg_redeem)
-        .add_message(msg_update_global_index);
+        .add_message(msg_redeem);
     Ok(res)
 }
 
