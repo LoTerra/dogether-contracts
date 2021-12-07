@@ -29,6 +29,10 @@ pub enum ExecuteMsg {
     ClaimUnPool {},
     /// Redeem earning from anchor
     RedeemEarning {},
+    /// Purchase tickets on LoTerra lottery contract with pool rewards coop mode
+    GetTicket {
+        combination: Vec<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

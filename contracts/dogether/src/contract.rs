@@ -9,9 +9,7 @@ use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
 use crate::msg::{
     Anchor, ConfigResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
 };
-use crate::state::{
-    read_config, read_state, store_config, store_state, Config, State, CONFIG, STATE,
-};
+use crate::state::{read_config, read_state, store_config, store_state, Config, State, CONFIG, STATE, PREFIXED_COMBINATIONS};
 use crate::taxation::deduct_tax;
 use cosmwasm_bignumber::Decimal256;
 use cw20;
@@ -19,6 +17,7 @@ use cw20::{BalanceResponse, Cw20QueryMsg};
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
 use loterra_staking_contract_dogether::msg::MigrateMsg;
+use loterra;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -87,8 +86,114 @@ pub fn execute(
         ExecuteMsg::UnPool { amount } => try_un_pool(deps, env, info, amount),
         ExecuteMsg::ClaimUnPool {} => try_claim_un_pool(deps, env, info),
         ExecuteMsg::RedeemEarning {} => try_redeem_earning(deps, env, info),
+        ExecuteMsg::GetTicket { combination } => try_get_ticket(deps, env, info, combination)
     }
 }
+pub fn try_get_ticket(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    combination: Vec<String>,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+
+    if combination.is_empty() {
+        return Err(ContractError::NoCombinationFound {});
+    }
+    let recipient = env.contract.address.clone();
+    /*
+       Query price per tickets on lottery contract
+       Multiply price per ticket and combination.len()
+       Check if balance is > combination wanted
+       Loop combination and check if exist if yes return error if not save to PREFIXED_COMBINATIONS
+    */
+    /*
+       Query the price per tickets
+    */
+
+    let query = loterra::msg::QueryMsg::Config {};
+    let msg_query = WasmQuery::Smart {
+        contract_addr: deps.api.addr_humanize(&config.loterra_address)?.to_string(),
+        msg: to_binary(&query)?,
+    };
+
+    let query_loterra: loterra::msg::ConfigResponse = deps.querier.query(&msg_query.into())?;
+    let price_per_ticket = query_loterra.price_per_ticket_to_register;
+    // Total ticket cost
+    let total_ticket_cost = Uint128::from(price_per_ticket.u128() * combination.len() as u128);
+    // Total ticket cost minus fees
+    let total_ticket_cost_net = deduct_tax(
+        &deps.querier,
+        Coin {
+            denom: config.denom.clone(),
+            amount: total_ticket_cost,
+        },
+    )?
+        .amount;
+    // Total network fees
+    let total_fee = total_ticket_cost
+        .checked_sub(total_ticket_cost_net)
+        .unwrap();
+    // Total ticket cost + fees summation
+    let total_ticket_with_fees = total_ticket_cost.checked_add(total_fee).unwrap();
+    let dogether_balance = deps.querier.query_balance(env.contract.address, config.denom.clone())?;
+
+    // Check if enough rewards to buy tickets
+    if  dogether_balance.amount < total_ticket_with_fees {
+        return Err(ContractError::NoBalancePurchase(total_ticket_cost, total_fee, dogether_balance.amount));
+    }
+
+    /*
+       Check if it is the more efficient way to check combination exist
+    */
+    for combo in combination.clone() {
+        match PREFIXED_COMBINATIONS.may_load(
+            deps.storage,
+            (
+                &query_loterra.lottery_counter.to_be_bytes(),
+                &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                &combo.as_bytes(),
+            ),
+        )? {
+            None => {
+                PREFIXED_COMBINATIONS.save(
+                    deps.storage,
+                    (
+                        &query_loterra.lottery_counter.to_be_bytes(),
+                        &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                        &combo.as_bytes(),
+                    ),
+                    &combo,
+                )?;
+            }
+            Some(_) => {
+                return Err(ContractError::ComboAlreadyExist{});
+            }
+        }
+    }
+
+    let msg_loterra = loterra::msg::ExecuteMsg::Register {
+        address: Some(deps.api.addr_validate(&recipient.as_str().clone())?),
+        altered_bonus: None,
+        combination: combination.clone(),
+    };
+    let execute = WasmMsg::Execute {
+        contract_addr: deps.api.addr_humanize(&config.loterra_address)?.to_string(),
+        msg: to_binary(&msg_loterra)?,
+        funds: vec![Coin {
+            denom: config.denom,
+            amount: total_ticket_cost,
+        }],
+    };
+
+    let res = Response::new()
+        .add_message(execute)
+        .add_attribute("action", "get_ticket")
+        .add_attribute("player_address", recipient.as_str())
+        .add_attribute("ticket_number", combination.len().to_string());
+    Ok(res)
+}
+
 pub fn try_pool(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let mut state = read_state(deps.storage)?;
     let config = read_config(deps.storage)?;

@@ -41,7 +41,7 @@ thiserror = { version = "1.0.24" }
 cw20 = "0.9.1"
 cw20-base-dogether = {path="../../contracts/cw20-contract-dogether", features = ["library"]}
 loterra-staking-contract-dogether = {path="../../contracts/loterra-staking-contract-dogether", features = ["library"]}
-# loterra-staking-contract = "2.0.2"
+loterra = {version = "0.3.0", git = "https://github.com/LoTerra/loterra-contract.git", branch = "add-altered-jackpot", features = ["library"]}
 terra-cosmwasm = "~2.2.0"
 cosmwasm-bignumber = "~2.2.0"
 

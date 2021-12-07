@@ -744,28 +744,6 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
 
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
-        };
-        assert_eq!(
-            res.messages,
-            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: "loterra".to_string(),
-                msg: to_binary(&withdraw_msg).unwrap(),
-                funds: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128::from(1_u128)
-                }]
-            }))]
-        );
 
         let res = query(
             deps.as_ref(),

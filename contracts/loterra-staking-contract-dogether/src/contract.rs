@@ -1,7 +1,7 @@
 use crate::global::handle_update_global_index;
 use crate::state::{Config, State, CONFIG, STATE};
 use crate::user::{
-    handle_get_ticket, handle_receive, handle_unbound, handle_withdraw_stake,
+    handle_receive, handle_unbound, handle_withdraw_stake,
     query_accrued_rewards, query_holder, query_holders,
 };
 use cosmwasm_std::{
@@ -43,10 +43,6 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
-        ExecuteMsg::GetTicket {
-            recipient,
-            combination,
-        } => handle_get_ticket(deps, env, info, recipient, combination),
         ExecuteMsg::UpdateGlobalIndex {} => handle_update_global_index(deps, env, info),
         ExecuteMsg::UnbondStake { amount, address } => {
             handle_unbound(deps, env, info, amount, address)

@@ -1,5 +1,5 @@
 use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint128};
-use cw_storage_plus::Item;
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -43,3 +43,5 @@ pub fn store_state(storage: &mut dyn Storage, state: &State) -> StdResult<()> {
 pub fn read_state(storage: &dyn Storage) -> StdResult<State> {
     STATE.load(storage)
 }
+
+pub const PREFIXED_COMBINATIONS: Map<(&[u8], &[u8], &[u8]), String> = Map::new("combinations");
