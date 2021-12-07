@@ -314,14 +314,6 @@ pub fn try_redeem_earning(
             amount: Uint128::from(interest_accrued_ust * Uint128::from(1_u128)),
         },
     )?;
-    // Get the total contract balance and send all ust to staking contract
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address.clone(), config.denom.clone())?;
-    let contract_balance = precision_amount_to_send
-        .amount
-        .checked_add(balance.amount)
-        .unwrap_or(precision_amount_to_send.amount);
 
     /*
        Send earning to staking contract
@@ -335,7 +327,7 @@ pub fn try_redeem_earning(
             &deps.querier,
             Coin {
                 denom: config.denom,
-                amount: contract_balance,
+                amount: precision_amount_to_send.amount,
             },
         )?],
     });
