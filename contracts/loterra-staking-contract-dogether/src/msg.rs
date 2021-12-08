@@ -34,6 +34,9 @@ pub enum ExecuteMsg {
         address: String,
     },
 
+    /// return the accrued reward in ust to the user.
+    ClaimRewards { recipient: Option<String> },
+
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
 }

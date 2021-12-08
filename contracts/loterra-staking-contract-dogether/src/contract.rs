@@ -1,9 +1,6 @@
 use crate::global::handle_update_global_index;
 use crate::state::{Config, State, CONFIG, STATE};
-use crate::user::{
-    handle_receive, handle_unbound, handle_withdraw_stake,
-    query_accrued_rewards, query_holder, query_holders,
-};
+use crate::user::{handle_claim_rewards, handle_receive, handle_unbound, handle_withdraw_stake, query_accrued_rewards, query_holder, query_holders};
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     Uint128,
@@ -43,6 +40,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     match msg {
+        ExecuteMsg::ClaimRewards { recipient } => handle_claim_rewards(deps, env, info, recipient),
         ExecuteMsg::UpdateGlobalIndex {} => handle_update_global_index(deps, env, info),
         ExecuteMsg::UnbondStake { amount, address } => {
             handle_unbound(deps, env, info, amount, address)

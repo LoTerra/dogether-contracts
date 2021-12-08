@@ -426,29 +426,6 @@ mod tests {
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info("addr0000", &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
-        };
-        println!("{:?}", res);
-        assert_eq!(
-            res.messages,
-            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: "loterra".to_string(),
-                msg: to_binary(&withdraw_msg).unwrap(),
-                funds: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128::from(1_u128)
-                }]
-            }))]
-        );
         let mut holder: Holder = read_holder(
             deps.as_ref().storage,
             &deps.api.addr_canonicalize(&"addr0000").unwrap(),
@@ -463,21 +440,6 @@ mod tests {
         //let msg = ExecuteMsg::UpdateGlobalIndex {};
         //execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec![
-                "223456".to_string(),
-                "223457".to_string(),
-                "223458".to_string(),
-                "223459".to_string(),
-            ],
-        };
-        let info = mock_info("addr0000", &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg);
-        match res {
-            Err(StdError::GenericErr {msg, ..}) => assert_eq!(msg, "Not enough funds, you want to buy 4UST + 1UST network fees tickets and you only have 2UST"),
-            _ => panic!("Do not enter here")
-        }
     }
 
     #[test]
@@ -521,29 +483,6 @@ mod tests {
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
-        };
-        assert_eq!(
-            res.messages,
-            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: "loterra".to_string(),
-                msg: to_binary(&withdraw_msg).unwrap(),
-                funds: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128::from(1_u128)
-                }]
-            }))]
-        );
 
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
@@ -633,29 +572,6 @@ mod tests {
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
-        };
-        assert_eq!(
-            res.messages,
-            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: "loterra".to_string(),
-                msg: to_binary(&withdraw_msg).unwrap(),
-                funds: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: Uint128::from(1_u128)
-                }]
-            }))]
-        );
 
         // withdraw stake
         let msg = ExecuteMsg::UnbondStake {
@@ -988,26 +904,6 @@ mod tests {
         )
         .unwrap();
 
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
-        let msg = ExecuteMsg::GetTicket {
-            recipient: Addr::unchecked("addr0002").to_string(),
-            combination: vec!["123456".to_string()],
-        };
-        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
-        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let res = query(deps.as_ref(), env.clone(), QueryMsg::State {}).unwrap();
         let state_response: StateResponse = from_binary(&res).unwrap();

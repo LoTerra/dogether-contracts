@@ -1,12 +1,10 @@
+use std::str::FromStr;
 use crate::state::{
     read_holder, read_holders, store_holder, Config, Holder, State, CONFIG,
     STATE,
 };
 
-use cosmwasm_std::{
-    from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128, WasmMsg, WasmQuery,
-};
+use cosmwasm_std::{from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery, CosmosMsg, BankMsg};
 
 use crate::claim::{claim_tokens, create_claim};
 use crate::math::{
@@ -15,6 +13,61 @@ use crate::math::{
 use crate::msg::{AccruedRewardsResponse, HolderResponse, HoldersResponse, ReceiveMsg};
 use crate::taxation::deduct_tax;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, Expiration};
+
+pub fn handle_claim_rewards(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    recipient: Option<String>,
+) -> StdResult<Response> {
+    let holder_addr = info.sender;
+    let holder_addr_raw = deps.api.addr_canonicalize(&holder_addr.as_str())?;
+
+    let recipient = match recipient {
+        Some(value) => deps.api.addr_validate(value.as_str()).unwrap(),
+        None => holder_addr.clone(),
+    };
+
+    let mut holder: Holder = read_holder(deps.storage, &holder_addr_raw)?;
+    let mut state: State = STATE.load(deps.storage)?;
+    let config: Config = CONFIG.load(deps.storage)?;
+
+    let reward_with_decimals =
+        calculate_decimal_rewards(state.global_index, holder.index, holder.balance)?;
+
+    let all_reward_with_decimals =
+        decimal_summation_in_256(reward_with_decimals, holder.pending_rewards);
+    let decimals = get_decimals(all_reward_with_decimals).unwrap();
+
+    let rewards = all_reward_with_decimals * Uint128::from(1u128);
+
+    if rewards.is_zero() {
+        return Err(StdError::generic_err("No rewards have accrued yet"));
+    }
+    //let f = state.prev_reward_balance.wrapping_sub(rewards);
+    let new_balance = (state.prev_reward_balance.checked_sub(rewards))?;
+    state.prev_reward_balance = new_balance;
+    STATE.save(deps.storage, &state)?;
+
+    holder.pending_rewards = decimals;
+    holder.index = state.global_index;
+    store_holder(deps.storage, &holder_addr_raw, &holder)?;
+
+    Ok(Response::new()
+        .add_message(CosmosMsg::Bank(BankMsg::Send {
+            to_address: recipient.to_string(),
+            amount: vec![deduct_tax(
+                &deps.querier,
+                Coin {
+                    denom: config.reward_denom,
+                    amount: rewards,
+                },
+            )?],
+        }))
+        .add_attribute("action", "claim_reward")
+        .add_attribute("holder_address", holder_addr)
+        .add_attribute("rewards", rewards))
+}
 
 pub fn handle_receive(
     deps: DepsMut,
@@ -215,7 +268,7 @@ fn calculate_decimal_rewards(
 }
 
 // calculate the reward with decimal
-/*
+
 fn get_decimals(value: Decimal) -> StdResult<Decimal> {
     let stringed: &str = &*value.to_string();
     let parts: &[&str] = &*stringed.split('.').collect::<Vec<&str>>();
@@ -227,7 +280,7 @@ fn get_decimals(value: Decimal) -> StdResult<Decimal> {
         }
         _ => Err(StdError::generic_err("Unexpected number of dots")),
     }
-}*/
+}
 
 #[cfg(test)]
 mod tests {
