@@ -1,6 +1,9 @@
 use crate::global::handle_update_global_index;
 use crate::state::{Config, State, CONFIG, STATE};
-use crate::user::{handle_claim_rewards, handle_receive, handle_unbound, handle_withdraw_stake, query_accrued_rewards, query_holder, query_holders};
+use crate::user::{
+    handle_claim_rewards, handle_receive, handle_unbound, handle_withdraw_stake,
+    query_accrued_rewards, query_holder, query_holders,
+};
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
     Uint128,

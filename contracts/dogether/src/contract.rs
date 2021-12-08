@@ -9,15 +9,18 @@ use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
 use crate::msg::{
     Anchor, ConfigResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
 };
-use crate::state::{read_config, read_state, store_config, store_state, Config, State, CONFIG, STATE, PREFIXED_COMBINATIONS};
+use crate::state::{
+    read_config, read_state, store_config, store_state, Config, State, CONFIG,
+    PREFIXED_COMBINATIONS, STATE,
+};
 use crate::taxation::deduct_tax;
 use cosmwasm_bignumber::Decimal256;
 use cw20;
 use cw20::{BalanceResponse, Cw20QueryMsg};
 use cw20_base_dogether;
+use loterra;
 use loterra_staking_contract_dogether;
 use loterra_staking_contract_dogether::msg::MigrateMsg;
-use loterra;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -86,7 +89,7 @@ pub fn execute(
         ExecuteMsg::UnPool { amount } => try_un_pool(deps, env, info, amount),
         ExecuteMsg::ClaimUnPool {} => try_claim_un_pool(deps, env, info),
         ExecuteMsg::RedeemEarning {} => try_redeem_earning(deps, env, info),
-        ExecuteMsg::GetTicket { combination } => try_get_ticket(deps, env, info, combination)
+        ExecuteMsg::GetTicket { combination } => try_get_ticket(deps, env, info, combination),
     }
 }
 pub fn try_get_ticket(
@@ -129,18 +132,24 @@ pub fn try_get_ticket(
             amount: total_ticket_cost,
         },
     )?
-        .amount;
+    .amount;
     // Total network fees
     let total_fee = total_ticket_cost
         .checked_sub(total_ticket_cost_net)
         .unwrap();
     // Total ticket cost + fees summation
     let total_ticket_with_fees = total_ticket_cost.checked_add(total_fee).unwrap();
-    let dogether_balance = deps.querier.query_balance(env.contract.address, config.denom.clone())?;
+    let dogether_balance = deps
+        .querier
+        .query_balance(env.contract.address, config.denom.clone())?;
 
     // Check if enough rewards to buy tickets
-    if  dogether_balance.amount < total_ticket_with_fees {
-        return Err(ContractError::NoBalancePurchase(total_ticket_cost, total_fee, dogether_balance.amount));
+    if dogether_balance.amount < total_ticket_with_fees {
+        return Err(ContractError::NoBalancePurchase(
+            total_ticket_cost,
+            total_fee,
+            dogether_balance.amount,
+        ));
     }
 
     /*
@@ -167,7 +176,7 @@ pub fn try_get_ticket(
                 )?;
             }
             Some(_) => {
-                return Err(ContractError::ComboAlreadyExist{});
+                return Err(ContractError::ComboAlreadyExist {});
             }
         }
     }
@@ -414,8 +423,7 @@ pub fn try_redeem_earning(
 
     state.next_draw = state.next_draw.checked_add(state.draw_period).unwrap();
     store_state(deps.storage, &state)?;
-    let res = Response::new()
-        .add_message(msg_redeem);
+    let res = Response::new().add_message(msg_redeem);
     Ok(res)
 }
 

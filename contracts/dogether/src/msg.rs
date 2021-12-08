@@ -30,9 +30,7 @@ pub enum ExecuteMsg {
     /// Redeem earning from anchor
     RedeemEarning {},
     /// Purchase tickets on LoTerra lottery contract with pool rewards coop mode
-    GetTicket {
-        combination: Vec<String>,
-    },
+    GetTicket { combination: Vec<String> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

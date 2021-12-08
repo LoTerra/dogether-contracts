@@ -92,4 +92,3 @@ fn calc_range_start(api: &dyn Api, start_after: Option<Addr>) -> StdResult<Optio
         None => Ok(None),
     }
 }
-

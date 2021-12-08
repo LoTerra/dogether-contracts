@@ -439,7 +439,6 @@ mod tests {
         //let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         //let msg = ExecuteMsg::UpdateGlobalIndex {};
         //execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-
     }
 
     #[test]
@@ -659,7 +658,6 @@ mod tests {
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let msg = ExecuteMsg::UpdateGlobalIndex {};
         execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
-
 
         let res = query(
             deps.as_ref(),
@@ -903,7 +901,6 @@ mod tests {
             &holder,
         )
         .unwrap();
-
 
         let res = query(deps.as_ref(), env.clone(), QueryMsg::State {}).unwrap();
         let state_response: StateResponse = from_binary(&res).unwrap();

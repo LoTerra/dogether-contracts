@@ -1,10 +1,10 @@
+use crate::state::{read_holder, read_holders, store_holder, Config, Holder, State, CONFIG, STATE};
 use std::str::FromStr;
-use crate::state::{
-    read_holder, read_holders, store_holder, Config, Holder, State, CONFIG,
-    STATE,
-};
 
-use cosmwasm_std::{from_binary, to_binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery, CosmosMsg, BankMsg};
+use cosmwasm_std::{
+    from_binary, to_binary, BankMsg, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+};
 
 use crate::claim::{claim_tokens, create_claim};
 use crate::math::{
