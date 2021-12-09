@@ -207,6 +207,32 @@ pub fn try_claim_un_pool(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     let state = read_state(deps.storage)?;
+    let config = read_config(deps.storage)?;
+    /*
+        Instant withdraw option with payment
+    */
+    let sent = match info.funds.len() {
+        0 => Ok(Uint128::zero()),
+        1 => {
+            if info.funds[0].denom != config.denom {
+                return Err(ContractError::WrongDenom {});
+            }
+            Ok(info.funds[0].amount)
+        }
+        _ => Err(ContractError::MultipleDenoms {}),
+    }?;
+
+    let mut coins = vec![];
+    if !sent.is_zero() {
+        coins.push(deduct_tax(
+            &deps.querier,
+            Coin {
+                denom: config.denom,
+                amount: sent,
+            },
+        )?)
+    }
+
     /*
        Call staking contract in order to withdrawal unPool with un-bonding period succeed
     */
@@ -221,7 +247,7 @@ pub fn try_claim_un_pool(
     let withdraw_msg = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&state.staking_address)?.to_string(),
         msg: to_binary(&withdraw)?,
-        funds: vec![],
+        funds: coins,
     };
     let cosmos_msg = CosmosMsg::Wasm(withdraw_msg);
 
