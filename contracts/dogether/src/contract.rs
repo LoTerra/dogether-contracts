@@ -7,7 +7,8 @@ use cosmwasm_std::{
 use crate::error::ContractError;
 use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
 use crate::msg::{
-    Anchor, ConfigResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    Anchor, ConfigResponse, EpochStateResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+    StateResponse,
 };
 use crate::state::{
     read_config, read_state, store_config, store_state, Config, State, CONFIG, STATE,
@@ -18,7 +19,6 @@ use cw20;
 use cw20::{BalanceResponse, Cw20QueryMsg};
 use cw20_base_dogether;
 use loterra_staking_contract_dogether;
-use loterra_staking_contract_dogether::msg::MigrateMsg;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -613,8 +613,26 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    Ok(Response::default())
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    let state = read_state(deps.storage)?;
+    //let cw20_address = deps.api.addr_humanize(&state.cw20_address)?;
+    let staking_address = deps.api.addr_humanize(&state.staking_address)?;
+
+    // let migrate_cw20 = WasmMsg::Migrate {
+    //     contract_addr: cw20_address.to_string(),
+    //     new_code_id: msg.code_id_cw20,
+    //     msg: Default::default()
+    // };
+
+    let migrate_staking = WasmMsg::Migrate {
+        contract_addr: staking_address.to_string(),
+        new_code_id: msg.code_id_staking,
+        msg: msg.message_staking,
+    };
+
+    //let cosmos_msg_migrate_cw20 = CosmosMsg::Wasm(migrate_cw20);
+    let cosmos_msg_migrate_staking = CosmosMsg::Wasm(migrate_staking);
+    Ok(Response::new().add_message(cosmos_msg_migrate_staking))
 }
 
 #[cfg(test)]
