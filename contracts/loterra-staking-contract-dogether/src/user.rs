@@ -296,11 +296,11 @@ pub fn handle_withdraw_stake(
         _ => Err(StdError::generic_err("Too much denoms")),
     }?;
 
-    let mut amount = Uint128::zero();
-    if !sent.is_zero() {
-        amount = claim_tokens(deps.storage, address_raw, &env.block, cap, true)?;
+    let amount = if !sent.is_zero() {
+        let claimable_amount = claim_tokens(deps.storage, address_raw, &env.block, cap, true)?;
         // 30%, with base 20% anchor earn and 10% flash withdraw fees
-        let year_ration = amount.multiply_ratio(Uint128::from(30_u8), Uint128::from(100_u8));
+        let year_ration =
+            claimable_amount.multiply_ratio(Uint128::from(30_u8), Uint128::from(100_u8));
         // 7 days unbonding period base divided by 365 days result final amount
         let to_tax_amount = year_ration.multiply_ratio(Uint128::from(7_u8), Uint128::from(365_u32));
         let tax_amount = deduct_tax(
@@ -317,9 +317,10 @@ pub fn handle_withdraw_stake(
                 to_tax_amount
             )));
         }
+        claimable_amount
     } else {
-        amount = claim_tokens(deps.storage, address_raw, &env.block, cap, false)?;
-    }
+        claim_tokens(deps.storage, address_raw, &env.block, cap, false)?
+    };
 
     if amount.is_zero() {
         return Err(StdError::generic_err("Wait for the unbonding period"));
