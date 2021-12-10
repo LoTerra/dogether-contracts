@@ -13,10 +13,6 @@ pub fn handle_update_global_index(
     let mut state = STATE.load(deps.storage)?;
     let config = CONFIG.load(deps.storage)?;
 
-    if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
-        return Err(StdError::generic_err("Not authorized"));
-    }
-
     // Zero staking balance check
     if state.total_balance.is_zero() {
         return Err(StdError::generic_err("No asset is bonded by Hub"));
