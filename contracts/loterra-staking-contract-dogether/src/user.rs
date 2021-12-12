@@ -156,7 +156,8 @@ pub fn handle_get_ticket(
         .add_message(execute)
         .add_attribute("action", "get_ticket")
         .add_attribute("player_address", recipient)
-        .add_attribute("ticket_number", combination.len().to_string());
+        .add_attribute("ticket_number", combination.len().to_string())
+        .add_attribute("lottery_id", query_loterra.lottery_counter.to_string());
     Ok(res)
 }
 
