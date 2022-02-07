@@ -691,7 +691,7 @@ mod tests {
             StateResponse {
                 global_index: index,
                 total_balance: Uint128::from(11_u128),
-                prev_reward_balance: Uint128::from(99997_u128)
+                prev_reward_balance: Uint128::from(99999_u128)
             }
         );
     }

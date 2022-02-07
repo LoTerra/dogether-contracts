@@ -99,11 +99,13 @@ pub fn try_get_ticket(
     combination: Vec<String>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
 
     if combination.is_empty() {
         return Err(ContractError::NoCombinationFound {});
     }
-    let recipient = env.contract.address.clone();
+    //let recipient = env.contract.address.clone();
+    let recipient = deps.api.addr_humanize(&state.staking_address).unwrap();
     /*
        Query price per tickets on lottery contract
        Multiply price per ticket and combination.len()
@@ -956,14 +958,6 @@ mod tests {
                     contract_addr: "aust".to_string(),
                     msg: to_binary(&redeem).unwrap(),
                     funds: vec![]
-                })),
-                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "staking".to_string(),
-                    msg: to_binary(&update_global_index).unwrap(),
-                    funds: vec![Coin {
-                        denom: "uusd".to_string(),
-                        amount: Uint128::from(14998000000u128)
-                    }]
                 }))
             ]
         )
