@@ -44,6 +44,9 @@ pub fn instantiate(
         label_staking: msg.label_staking,
         unbonding_period: msg.unbonding_period,
         loterra_address: deps.api.addr_canonicalize(msg.loterra_address.as_str())?,
+        loterra_staking_contract: deps
+            .api
+            .addr_canonicalize(msg.loterra_staking_contract.as_str())?,
     };
     store_config(deps.storage, &config)?;
 
@@ -105,7 +108,10 @@ pub fn try_get_ticket(
         return Err(ContractError::NoCombinationFound {});
     }
     //let recipient = env.contract.address.clone();
-    let recipient = deps.api.addr_humanize(&state.staking_address).unwrap();
+    let recipient = deps
+        .api
+        .addr_humanize(&config.loterra_staking_contract)
+        .unwrap();
     /*
        Query price per tickets on lottery contract
        Multiply price per ticket and combination.len()
@@ -664,6 +670,10 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
             .to_string(),
         unbonding_period: config.unbonding_period,
         loterra_address: deps.api.addr_humanize(&config.loterra_address)?.to_string(),
+        loterra_staking_contract: deps
+            .api
+            .addr_humanize(&config.loterra_staking_contract)?
+            .to_string(),
     })
 }
 
@@ -696,6 +706,7 @@ mod tests {
             draw_period: 100,
             unbonding_period: 100_000,
             loterra_address: "loterra".to_string(),
+            loterra_staking_contract: "loterraStaking".to_string(),
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
         // we can just call .unwrap() to assert this was a success
@@ -716,6 +727,7 @@ mod tests {
             draw_period: 1000,
             unbonding_period: 100_000,
             loterra_address: "loterra".to_string(),
+            loterra_staking_contract: "stakingLoterra".to_string(),
         };
         let info = mock_info("addr0000", &coins(1000, "uusd"));
 
@@ -953,13 +965,11 @@ mod tests {
 
         assert_eq!(
             res.messages,
-            vec![
-                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: "aust".to_string(),
-                    msg: to_binary(&redeem).unwrap(),
-                    funds: vec![]
-                }))
-            ]
+            vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: "aust".to_string(),
+                msg: to_binary(&redeem).unwrap(),
+                funds: vec![]
+            }))]
         )
     }
 

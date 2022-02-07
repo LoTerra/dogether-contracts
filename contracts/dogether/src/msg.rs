@@ -16,6 +16,7 @@ pub struct InstantiateMsg {
     pub draw_period: u64,
     pub unbonding_period: u64,
     pub loterra_address: String,
+    pub loterra_staking_contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -80,6 +81,7 @@ pub struct ConfigResponse {
     pub anchor_aust_address: String,
     pub unbonding_period: u64,
     pub loterra_address: String,
+    pub loterra_staking_contract: String,
 }
 
 // We define a custom struct for each query response

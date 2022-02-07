@@ -13,6 +13,7 @@ pub struct Config {
     pub label_staking: String,
     pub unbonding_period: u64,
     pub loterra_address: CanonicalAddr,
+    pub loterra_staking_contract: CanonicalAddr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
