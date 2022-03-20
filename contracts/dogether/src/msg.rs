@@ -88,4 +88,9 @@ pub struct EpochStateResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub code_id_cw20: u64,
+    pub message_cw20: Binary,
+    pub code_id_staking: u64,
+    pub message_staking: Binary,
+}

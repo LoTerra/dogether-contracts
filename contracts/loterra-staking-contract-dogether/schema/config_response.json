@@ -4,18 +4,26 @@
   "type": "object",
   "required": [
     "admin",
-    "cw20_token_addr",
-    "reward_denom",
+    "anchor_aust_address",
+    "denom",
+    "loterra_address",
+    "money_market_address",
     "unbonding_period"
   ],
   "properties": {
     "admin": {
       "type": "string"
     },
-    "cw20_token_addr": {
+    "anchor_aust_address": {
       "type": "string"
     },
-    "reward_denom": {
+    "denom": {
+      "type": "string"
+    },
+    "loterra_address": {
+      "type": "string"
+    },
+    "money_market_address": {
       "type": "string"
     },
     "unbonding_period": {

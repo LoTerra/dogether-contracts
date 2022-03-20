@@ -156,7 +156,8 @@ pub fn handle_get_ticket(
         .add_message(execute)
         .add_attribute("action", "get_ticket")
         .add_attribute("player_address", recipient)
-        .add_attribute("ticket_number", combination.len().to_string());
+        .add_attribute("ticket_number", combination.len().to_string())
+        .add_attribute("lottery_id", query_loterra.lottery_counter.to_string());
     Ok(res)
 }
 
@@ -280,10 +281,48 @@ pub fn handle_withdraw_stake(
     if config.admin != deps.api.addr_canonicalize(&info.sender.as_str())? {
         return Err(StdError::generic_err("Not authorized"));
     }
-
     let address_raw = deps.api.addr_canonicalize(&address.as_str())?;
 
-    let amount = claim_tokens(deps.storage, address_raw, &env.block, cap)?;
+    /*
+       Instant withdraw verification
+    */
+    let sent = match info.funds.len() {
+        0 => Ok(Uint128::zero()),
+        1 => {
+            if info.funds[0].denom != config.reward_denom {
+                return Err(StdError::generic_err("Wrong denom"));
+            }
+            Ok(info.funds[0].amount)
+        }
+        _ => Err(StdError::generic_err("Too much denoms")),
+    }?;
+
+    let amount = if !sent.is_zero() {
+        let claimable_amount = claim_tokens(deps.storage, address_raw, &env.block, cap, true)?;
+        // 30%, with base 20% anchor earn and 10% flash withdraw fees
+        let year_ration =
+            claimable_amount.multiply_ratio(Uint128::from(30_u8), Uint128::from(100_u8));
+        // 7 days unbonding period base divided by 365 days result final amount
+        let to_tax_amount = year_ration.multiply_ratio(Uint128::from(7_u8), Uint128::from(365_u32));
+        let tax_amount = deduct_tax(
+            &deps.querier,
+            Coin {
+                denom: config.reward_denom,
+                amount: to_tax_amount,
+            },
+        )?
+        .amount;
+        if tax_amount != sent {
+            return Err(StdError::generic_err(format!(
+                "You need to send {}, for instant withdrawal ",
+                to_tax_amount
+            )));
+        }
+        claimable_amount
+    } else {
+        claim_tokens(deps.storage, address_raw, &env.block, cap, false)?
+    };
+
     if amount.is_zero() {
         return Err(StdError::generic_err("Wait for the unbonding period"));
     }

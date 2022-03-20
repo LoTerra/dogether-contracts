@@ -590,6 +590,35 @@ mod tests {
                 funds: vec![]
             }))]
         );
+
+        // Instant withdraw test
+        let receive_msg = receive_stake_msg("addr0000", 100_000_000);
+        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        execute(deps.as_mut(), env.clone(), info, receive_msg.clone()).unwrap();
+        // withdraw stake
+        let msg = ExecuteMsg::UnbondStake {
+            amount: Uint128::from(100_000_000_u128),
+            address: "addr0000".to_string(),
+        };
+        let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
+        env.block.height = 5;
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // withdraw before unbonding fails
+        let msg = ExecuteMsg::WithdrawStake {
+            cap: None,
+            address: "addr0000".to_string(),
+        };
+        let info = mock_info(
+            MOCK_HUB_CONTRACT_ADDR,
+            &[Coin {
+                denom: "uusd".to_string(),
+                amount: Uint128::from(569645u128),
+            }],
+        );
+        env.block.height = 10;
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        println!("{:?}", res);
     }
 
     #[test]

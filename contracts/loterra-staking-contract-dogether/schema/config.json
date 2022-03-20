@@ -1,58 +1,40 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "InstantiateMsg",
+  "title": "Config",
   "type": "object",
   "required": [
+    "admin",
     "anchor_aust_address",
-    "code_id_cw20",
     "code_id_staking",
-    "draw_period",
-    "label_cw20",
+    "denom",
     "label_staking",
     "loterra_address",
-    "message_cw20",
     "money_market_address",
-    "next_draw",
     "unbonding_period"
   ],
   "properties": {
-    "anchor_aust_address": {
-      "type": "string"
+    "admin": {
+      "$ref": "#/definitions/CanonicalAddr"
     },
-    "code_id_cw20": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+    "anchor_aust_address": {
+      "$ref": "#/definitions/CanonicalAddr"
     },
     "code_id_staking": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
-    "draw_period": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "label_cw20": {
+    "denom": {
       "type": "string"
     },
     "label_staking": {
       "type": "string"
     },
     "loterra_address": {
-      "type": "string"
-    },
-    "message_cw20": {
-      "$ref": "#/definitions/Binary"
+      "$ref": "#/definitions/CanonicalAddr"
     },
     "money_market_address": {
-      "type": "string"
-    },
-    "next_draw": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+      "$ref": "#/definitions/CanonicalAddr"
     },
     "unbonding_period": {
       "type": "integer",
@@ -64,6 +46,9 @@
     "Binary": {
       "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
       "type": "string"
+    },
+    "CanonicalAddr": {
+      "$ref": "#/definitions/Binary"
     }
   }
 }

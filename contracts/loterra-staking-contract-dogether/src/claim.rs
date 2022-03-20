@@ -47,13 +47,14 @@ pub fn claim_tokens(
     addr: CanonicalAddr,
     block: &BlockInfo,
     cap: Option<Uint128>,
+    flash_withdraw: bool,
 ) -> StdResult<Uint128> {
     let mut to_send = Uint128::zero();
     CLAIM.update(storage, addr.as_slice(), |claim| -> StdResult<_> {
         let (_send, waiting): (Vec<_>, _) =
             claim.unwrap_or_default().iter().cloned().partition(|c| {
                 // if mature and we can pay fully, then include in _send
-                if c.release_at.is_expired(block) {
+                if c.release_at.is_expired(block) || flash_withdraw {
                     if let Some(limit) = cap {
                         if to_send + c.amount > limit {
                             return false;
