@@ -12,7 +12,10 @@ use crate::claim::{claim_tokens, create_claim};
 use crate::math::{
     decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256,
 };
-use crate::msg::{AccruedRewardsResponse, HolderResponse, HoldersResponse, ReceiveMsg};
+use crate::msg::{
+    AccruedRewardsResponse, HolderResponse, HoldersResponse, RapidoExecuteMsg, RapidoQueryMsg,
+    RapidoStateResponse, ReceiveMsg,
+};
 use crate::taxation::deduct_tax;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg, Expiration};
 use loterra;
@@ -22,9 +25,11 @@ pub fn handle_get_ticket(
     _env: Env,
     _info: MessageInfo,
     recipient: String,
-    combination: Vec<String>,
+    numbers: Vec<u8>,
+    multipliers: Uint128,
+    live_rounds: u16,
 ) -> StdResult<Response> {
-    if combination.is_empty() {
+    if numbers.is_empty() {
         return Err(StdError::generic_err("No combination found"));
     }
     let holder_addr_raw = deps.api.addr_canonicalize(&recipient.as_str())?;
@@ -56,15 +61,15 @@ pub fn handle_get_ticket(
     /*
        Query the price per tickets
     */
-    let query = loterra::msg::QueryMsg::Config {};
+    let query = RapidoQueryMsg::State {};
     let msg_query = WasmQuery::Smart {
         contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
         msg: to_binary(&query)?,
     };
-    let query_loterra: loterra::msg::ConfigResponse = deps.querier.query(&msg_query.into())?;
-    let price_per_ticket = query_loterra.price_per_ticket_to_register;
+    let query_loterra: RapidoStateResponse = deps.querier.query(&msg_query.into())?;
+
     // Total ticket cost
-    let total_ticket_cost = Uint128::from(price_per_ticket.u128() * combination.len() as u128);
+    let total_ticket_cost = Uint128::from(multipliers.u128() * live_rounds as u128);
     // Total ticket cost minus fees
     let total_ticket_cost_net = deduct_tax(
         &deps.querier,
@@ -92,32 +97,31 @@ pub fn handle_get_ticket(
     /*
        Check if it is the more efficient way to check combination exist
     */
-    for combo in combination.clone() {
-        match PREFIXED_COMBINATIONS.may_load(
-            deps.storage,
-            (
-                &query_loterra.lottery_counter.to_be_bytes(),
-                &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
-                &combo.as_bytes(),
-            ),
-        )? {
-            None => {
-                PREFIXED_COMBINATIONS.save(
-                    deps.storage,
-                    (
-                        &query_loterra.lottery_counter.to_be_bytes(),
-                        &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
-                        &combo.as_bytes(),
-                    ),
-                    &combo,
-                )?;
-            }
-            Some(_) => {
-                return Err(StdError::generic_err(format!(
-                    "Combination {} already exist",
-                    combo
-                )));
-            }
+
+    match PREFIXED_COMBINATIONS.may_load(
+        deps.storage,
+        (
+            &query_loterra.round.to_be_bytes(),
+            &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+            &numbers.as_slice(),
+        ),
+    )? {
+        None => {
+            PREFIXED_COMBINATIONS.save(
+                deps.storage,
+                (
+                    &query_loterra.round.to_be_bytes(),
+                    &deps.api.addr_canonicalize(&recipient.as_str())?.as_slice(),
+                    &numbers.as_slice(),
+                ),
+                &"number".to_string(),
+            )?;
+        }
+        Some(_) => {
+            return Err(StdError::generic_err(format!(
+                "Combination {:?} already exist",
+                numbers
+            )));
         }
     }
 
@@ -138,11 +142,13 @@ pub fn handle_get_ticket(
     holder.index = state.global_index;
     store_holder(deps.storage, &holder_addr_raw, &holder)?;
 
-    let msg_loterra = loterra::msg::ExecuteMsg::Register {
-        address: Some(deps.api.addr_validate(&recipient.clone())?),
-        altered_bonus: None,
-        combination: combination.clone(),
+    let msg_loterra = RapidoExecuteMsg::Register {
+        numbers,
+        multiplier: multipliers,
+        live_round: live_rounds,
+        address: Some(deps.api.addr_validate(&recipient.clone())?.to_string()),
     };
+
     let execute = WasmMsg::Execute {
         contract_addr: deps.api.addr_humanize(&config.loterra_addr)?.to_string(),
         msg: to_binary(&msg_loterra)?,
@@ -156,8 +162,7 @@ pub fn handle_get_ticket(
         .add_message(execute)
         .add_attribute("action", "get_ticket")
         .add_attribute("player_address", recipient)
-        .add_attribute("ticket_number", combination.len().to_string())
-        .add_attribute("lottery_id", query_loterra.lottery_counter.to_string());
+        .add_attribute("lottery_id", query_loterra.round.to_string());
     Ok(res)
 }
 

@@ -43,7 +43,9 @@ pub enum ExecuteMsg {
     /// Purchase tickets on LoTerra lottery contract with pool rewards
     GetTicket {
         recipient: String,
-        combination: Vec<String>,
+        numbers: Vec<u8>,
+        multiplier: Uint128,
+        live_round: u16,
     },
 }
 
@@ -74,6 +76,37 @@ pub enum QueryMsg {
     Claims {
         address: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RapidoQueryMsg {
+    State {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RapidoExecuteMsg {
+    Register {
+        numbers: Vec<u8>,
+        multiplier: Uint128,
+        live_round: u16,
+        address: Option<String>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RapidoStateResponse {
+    pub round: u64,
+    pub set_of_balls: u8,
+    pub range_min: u8,
+    pub range_max: u8,
+    pub bonus_set_of_balls: u8,
+    pub bonus_range_min: u8,
+    pub bonus_range_max: u8,
+    pub prize_rank: Vec<Uint128>,
+    pub ticket_price: Vec<Uint128>,
+    pub multiplier: Vec<Decimal>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

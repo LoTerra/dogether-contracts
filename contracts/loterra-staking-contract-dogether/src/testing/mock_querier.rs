@@ -1,3 +1,4 @@
+use crate::msg::RapidoStateResponse;
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
     from_slice, to_binary, Addr, Api, BalanceResponse, BankQuery, Binary, CanonicalAddr, Coin,
@@ -51,29 +52,19 @@ impl WasmMockQuerier {
         match &request {
             QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
                 if contract_addr == &"loterra".to_string() {
-                    let res = loterra::msg::ConfigResponse {
-                        admin: CanonicalAddr(to_binary(&"o").unwrap()),
-                        block_time_play: 0,
-                        every_block_time_play: 0,
-                        denom_stable: "".to_string(),
-                        combination_len: 0,
-                        jackpot_percentage_reward: 0,
-                        token_holder_percentage_fee_reward: 0,
-                        fee_for_drand_worker_in_percentage: 0,
-                        prize_rank_winner_percentage: vec![],
-                        poll_count: 0,
-                        poll_default_end_height: 0,
-                        price_per_ticket_to_register: Uint128::from(1_u128),
-                        terrand_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
-                        loterra_cw20_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
-                        loterra_staking_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
-                        altered_contract_address: CanonicalAddr(to_binary(&"o").unwrap()),
-                        safe_lock: false,
-                        lottery_counter: 0,
-                        holders_bonus_block_time_end: 0,
-                        bonus_burn_rate: 0,
-                        bonus: 0,
+                    let res = RapidoStateResponse {
+                        round: 1,
+                        set_of_balls: 0,
+                        range_min: 0,
+                        range_max: 0,
+                        bonus_set_of_balls: 0,
+                        bonus_range_min: 0,
+                        bonus_range_max: 0,
+                        prize_rank: vec![],
+                        ticket_price: vec![],
+                        multiplier: vec![],
                     };
+
                     return SystemResult::Ok(ContractResult::from(to_binary(&res)));
                 }
                 panic!("DO NOT ENTER HERE")

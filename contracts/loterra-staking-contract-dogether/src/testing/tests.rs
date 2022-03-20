@@ -29,7 +29,7 @@ mod tests {
     use crate::math::{decimal_multiplication_in_256, decimal_subtraction_in_256};
     use crate::msg::{
         ConfigResponse, ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg,
-        ReceiveMsg, StateResponse,
+        RapidoExecuteMsg, ReceiveMsg, StateResponse,
     };
     use crate::state::{read_holder, store_holder, Holder, State, STATE};
     use crate::testing;
@@ -428,15 +428,20 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
         };
+
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
+        let withdraw_msg = RapidoExecuteMsg::Register {
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1_u128),
+            live_round: 1,
+            address: Some(deps.api.addr_validate("addr0000").unwrap().to_string()),
         };
+
         println!("{:?}", res);
         assert_eq!(
             res.messages,
@@ -465,12 +470,9 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec![
-                "223456".to_string(),
-                "223457".to_string(),
-                "223458".to_string(),
-                "223459".to_string(),
-            ],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 4,
         };
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg);
@@ -524,15 +526,19 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
         };
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
+        let withdraw_msg = RapidoExecuteMsg::Register {
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1_u128),
+            live_round: 1,
+            address: Some(deps.api.addr_validate("addr0000").unwrap().to_string()),
         };
+
         assert_eq!(
             res.messages,
             vec![SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -665,14 +671,17 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
         };
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
+        let withdraw_msg = RapidoExecuteMsg::Register {
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
+            address: Some(deps.api.addr_validate("addr0000").unwrap().to_string()),
         };
         assert_eq!(
             res.messages,
@@ -775,14 +784,18 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
         };
+
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
-        let withdraw_msg = loterra::msg::ExecuteMsg::Register {
-            address: Some(deps.api.addr_validate("addr0000").unwrap()),
-            altered_bonus: None,
-            combination: vec!["123456".to_string()],
+        let withdraw_msg = RapidoExecuteMsg::Register {
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1u128),
+            live_round: 1,
+            address: Some(deps.api.addr_validate("addr0000").unwrap().to_string()),
         };
         assert_eq!(
             res.messages,
@@ -1041,21 +1054,27 @@ mod tests {
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0000").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1_000_000u128),
+            live_round: 1,
         };
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0001").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1_000_000u128),
+            live_round: 1,
         };
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::GetTicket {
             recipient: Addr::unchecked("addr0002").to_string(),
-            combination: vec!["123456".to_string()],
+            numbers: vec![1, 2, 3, 4, 5],
+            multiplier: Uint128::from(1_000_000u128),
+            live_round: 1,
         };
         let info = mock_info(MOCK_HUB_CONTRACT_ADDR, &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
